@@ -5,7 +5,7 @@
  */
 
 // ── API Base URL — change this to your deployed server URL in production ──
-var API_BASE = 'http://localhost:5000/api';
+var API_BASE = 'https://scasflix-server.onrender.com/api';
 
 // ── Storage Keys ──────────────────────────────────────────────────────
 var SESSION_KEY  = 'scasflix_session';   // signed-in user object
