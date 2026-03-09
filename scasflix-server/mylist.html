@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCASFLIX — My List</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .mylist-header { padding: 120px 40px 32px; }
+    .mylist-header h2 { font-size: 2rem; font-weight: 900; color: #fff; margin-bottom: 6px; }
+    .mylist-header p  { color: #888; font-size: 0.95rem; }
+    .mylist-empty {
+      text-align: center; padding: 80px 20px; color: #555;
+    }
+    .mylist-empty svg { width: 64px; height: 64px; fill: #333; margin: 0 auto 20px; display: block; }
+    .mylist-empty h3  { font-size: 1.3rem; color: #666; margin-bottom: 10px; }
+    .mylist-empty p   { font-size: 0.9rem; color: #444; margin-bottom: 24px; }
+    .mylist-empty a {
+      display: inline-block; padding: 11px 32px;
+      background: #e50914; color: #fff; border-radius: 4px;
+      font-weight: 700; text-decoration: none; font-size: 0.95rem;
+      transition: background 0.2s;
+    }
+    .mylist-empty a:hover { background: #c40812; }
+    .mylist-grid-wrap { padding: 0 40px 60px; }
+    .btn-remove-list {
+      margin-top: 8px; padding: 5px 12px;
+      background: transparent; color: #e57373;
+      border: 1px solid #7d2e2e; border-radius: 4px;
+      font-size: 0.78rem; cursor: pointer;
+      transition: all 0.2s; display: block; width: 100%;
+    }
+    .btn-remove-list:hover { background: #4a1a1a; border-color: #e57373; }
+    @media (max-width: 600px) {
+      .mylist-header, .mylist-grid-wrap { padding-left: 16px; padding-right: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="toast-alert hidden" id="toast"></div>
+
+<nav class="navbar" id="navbar">
+  <a class="navbar-brand" href="index.html">SCASFLIX</a>
+  <ul class="navbar-links">
+    <li><a href="index.html">Home</a></li>
+    <li class="nav-hide"><a href="#">TV Shows</a></li>
+    <li class="nav-hide"><a href="#">Movies</a></li>
+    <li class="nav-hide"><a href="#">Anime</a></li>
+    <li class="nav-hide"><a href="mylist.html" style="color:#fff;">My List</a></li>
+    <li style="display:flex;align-items:center;gap:6px;">
+      <input id="navSearchInput" type="text" placeholder="Search titles..."
+        style="background:#1e1e1e;border:1px solid #444;border-radius:4px;padding:5px 10px;color:#fff;font-size:0.85rem;width:160px;outline:none;"
+        onfocus="this.style.borderColor='#e50914'" onblur="this.style.borderColor='#444'">
+      <button id="navSearchBtn"
+        style="background:#e50914;border:none;border-radius:4px;padding:5px 10px;color:#fff;cursor:pointer;font-size:0.85rem;">&#128269;</button>
+    </li>
+    <li id="navAuthArea"></li>
+  </ul>
+</nav>
+
+<div class="mylist-header">
+  <h2>My List</h2>
+  <p id="myListCount">Loading...</p>
+</div>
+
+<div class="mylist-grid-wrap">
+  <div class="cards-grid" id="myListGrid"></div>
+  <div class="mylist-empty" id="myListEmpty" style="display:none;">
+    <svg viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
+    <h3>Your list is empty</h3>
+    <p>Add movies and shows from the home page to see them here.</p>
+    <a href="index.html">Browse SCASFLIX</a>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script src="navbar.js"></script>
+<script>
+  window.addEventListener('scroll', function () {
+    document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 50);
+  });
+
+  async function renderMyList() {
+    var grid  = document.getElementById('myListGrid');
+    var empty = document.getElementById('myListEmpty');
+    var count = document.getElementById('myListCount');
+
+    count.textContent = 'Loading...';
+    grid.innerHTML    = '';
+
+    var list = await getMyList();
+
+    if (!list || list.length === 0) {
+      empty.style.display = 'block';
+      count.textContent   = '';
+      return;
+    }
+
+    empty.style.display = 'none';
+    count.textContent   = list.length + ' title' + (list.length === 1 ? '' : 's') + ' saved';
+
+    list.forEach(function(item) {
+      var card = document.createElement('div');
+      card.className = 'movie-card';
+      card.innerHTML =
+        '<img src="' + (item.posterUrl || '') + '" alt="' + esc(item.title) + '" loading="lazy">' +
+        '<div class="movie-card-body">' +
+          '<h6>' + esc(item.title) + '</h6>' +
+          '<p>'  + esc(item.genre || '') + '</p>' +
+          '<span class="badge-sm">' + esc(item.score || '') + '</span>' +
+          '<button class="btn-remove-list" data-tmdbid="' + item.tmdbId + '" data-title="' + esc(item.title) + '">✕ Remove</button>' +
+        '</div>';
+      grid.appendChild(card);
+    });
+
+    grid.querySelectorAll('.btn-remove-list').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var tmdbId = parseInt(btn.getAttribute('data-tmdbid'));
+        var title  = btn.getAttribute('data-title');
+        await removeFromList(tmdbId);
+        showToast('"' + title + '" removed from My List.', 'info');
+        renderMyList();
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', renderMyList);
+</script>
+
+</body>
+</html>

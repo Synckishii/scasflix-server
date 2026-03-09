@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCASFLIX - Sign In</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { animation: pageFadeIn 0.6s ease both; }
+    @keyframes pageFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .auth-box {
+      animation: boxSlideUp 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: 0.15s;
+    }
+    @keyframes boxSlideUp {
+      from { opacity: 0; transform: translateY(28px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .auth-navbar .navbar-brand {
+      animation: brandPop 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: 0.05s;
+    }
+    @keyframes brandPop {
+      from { opacity: 0; letter-spacing: 8px; }
+      to   { opacity: 1; letter-spacing: 3px; }
+    }
+    .auth-input { transition: background 0.2s, box-shadow 0.25s; }
+    .auth-input:focus {
+      background: #3a3a3a !important;
+      box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.35) !important;
+    }
+    .auth-btn { position: relative; overflow: hidden; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+    .auth-btn.loading { pointer-events: none; opacity: 0.75; }
+    .auth-btn .btn-text { transition: opacity 0.2s; }
+    .auth-btn .btn-spinner { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; }
+    .auth-btn.loading .btn-text    { opacity: 0; }
+    .auth-btn.loading .btn-spinner { display: flex; }
+    .spinner-ring {
+      width: 22px; height: 22px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%      { transform: translateX(-8px); }
+      40%      { transform: translateX(8px); }
+      60%      { transform: translateX(-5px); }
+      80%      { transform: translateX(5px); }
+    }
+    .shake { animation: shake 0.4s ease both; }
+    .auth-alert {
+      overflow: hidden; max-height: 0;
+      padding-top: 0 !important; padding-bottom: 0 !important;
+      margin-bottom: 0; opacity: 0;
+      transition: max-height 0.35s ease, opacity 0.3s ease, padding 0.3s ease, margin-bottom 0.3s ease;
+    }
+    .auth-alert.success,
+    .auth-alert.error,
+    .auth-alert.info {
+      max-height: 80px; padding-top: 11px !important;
+      padding-bottom: 11px !important; margin-bottom: 16px; opacity: 1;
+    }
+
+    /* Cinematic overlay */
+    #cinematic {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #000;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      pointer-events: none; opacity: 0;
+      transition: opacity 0.45s ease;
+    }
+    #cinematic.active { opacity: 1; pointer-events: all; }
+    #cinematic-curtain {
+      position: absolute; inset: 0; background: #e50914;
+      transform: translateY(100%);
+      transition: transform 0.55s cubic-bezier(0.76, 0, 0.24, 1);
+    }
+    #cinematic.curtain-up #cinematic-curtain { transform: translateY(0%); }
+    #cinematic.curtain-recede #cinematic-curtain {
+      transform: translateY(-100%);
+      transition: transform 0.55s cubic-bezier(0.76, 0, 0.24, 1);
+    }
+    #cinematic-logo {
+      position: relative; z-index: 2;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(3.5rem, 10vw, 7rem);
+      letter-spacing: 6px; color: #fff;
+      opacity: 0; transform: scale(0.8);
+      transition: opacity 0.4s ease 0.45s, transform 0.5s cubic-bezier(0.22,1,0.36,1) 0.45s;
+    }
+    #cinematic.curtain-up #cinematic-logo { opacity: 1; transform: scale(1); }
+    #cinematic-bar {
+      position: relative; z-index: 2;
+      width: 0; height: 3px; background: rgba(255,255,255,0.9);
+      border-radius: 2px; margin-top: 18px;
+      transition: width 1.2s ease 0.7s;
+    }
+    #cinematic.curtain-up #cinematic-bar { width: clamp(120px, 25vw, 260px); }
+    #cinematic-tag {
+      position: relative; z-index: 2;
+      font-family: 'Inter', sans-serif; font-size: 0.78rem;
+      letter-spacing: 4px; text-transform: uppercase;
+      color: rgba(255,255,255,0.55); margin-top: 16px;
+      opacity: 0; transform: translateY(6px);
+      transition: opacity 0.5s ease 1s, transform 0.5s ease 1s;
+    }
+    #cinematic.curtain-up #cinematic-tag { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body class="auth-page-body">
+
+<div id="cinematic">
+  <div id="cinematic-curtain"></div>
+  <div id="cinematic-logo">SCASFLIX</div>
+  <div id="cinematic-bar"></div>
+  <div id="cinematic-tag">Stream Your Favorites</div>
+</div>
+
+<div class="auth-bg"></div>
+
+<nav class="auth-navbar">
+  <a class="navbar-brand" href="login.html">SCASFLIX</a>
+</nav>
+
+<div class="auth-box">
+  <div class="auth-tabs">
+    <div class="auth-tab active" id="tabSignin" onclick="switchTab('signin')">Sign In</div>
+    <div class="auth-tab"        id="tabSignup" onclick="switchTab('signup')">Sign Up</div>
+  </div>
+
+  <div class="auth-alert" id="authAlert"></div>
+
+  <!-- SIGN IN -->
+  <div class="auth-panel active" id="panelSignin">
+    <input type="email"    id="siEmail"    class="auth-input" placeholder="Email address"
+           autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('siPassword').focus()">
+    <input type="password" id="siPassword" class="auth-input" placeholder="Password"
+           autocomplete="current-password" onkeydown="if(event.key==='Enter')handleSignIn()">
+    <div class="remember-row">
+      <label class="check-label"><input type="checkbox" id="rememberMe"> Remember me</label>
+      <a href="#" class="forgot-link">Forgot password?</a>
+    </div>
+    <button class="auth-btn" id="btnSignIn" onclick="handleSignIn()">
+      <span class="btn-text">Sign In</span>
+      <span class="btn-spinner"><div class="spinner-ring"></div></span>
+    </button>
+    <div class="auth-divider">— OR —</div>
+    <p class="auth-footer-txt">New to SCASFLIX? <a onclick="switchTab('signup')">Sign up now.</a></p>
+  </div>
+
+  <!-- SIGN UP -->
+  <div class="auth-panel" id="panelSignup">
+    <input type="text"     id="suName"     class="auth-input" placeholder="Full Name"         autocomplete="name">
+    <input type="email"    id="suEmail"    class="auth-input" placeholder="Email address"     autocomplete="email">
+    <input type="password" id="suPassword" class="auth-input" placeholder="Create a password" autocomplete="new-password"
+           oninput="updateStrength(this.value)">
+    <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+    <div class="strength-label" id="strengthLabel"></div>
+    <input type="password" id="suConfirm"  class="auth-input" placeholder="Confirm password"  autocomplete="new-password">
+    <label class="terms-label">
+      <input type="checkbox" id="agreeTerms">
+      I agree to the <span>Terms of Use</span> and <span>Privacy Policy</span>
+    </label>
+    <button class="auth-btn" id="btnSignUp" onclick="handleSignUp()">
+      <span class="btn-text">Create Account</span>
+      <span class="btn-spinner"><div class="spinner-ring"></div></span>
+    </button>
+    <p class="auth-footer-txt">Already have an account? <a onclick="switchTab('signin')">Sign in.</a></p>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+  // ── Boot ──────────────────────────────────────────────────────────
+  (function () {
+    var params  = new URLSearchParams(window.location.search);
+    var tab     = params.get('tab')      || 'signin';
+    var msgType = params.get('msg_type') || '';
+    var msgText = params.get('msg')      || '';
+
+    switchTab(tab);
+    if (msgType && msgText) showAlert(decodeURIComponent(msgText), msgType);
+
+    // Already signed in? Skip login
+    if (getCurrentUser()) {
+      if (getActiveProfile()) window.location.replace('index.html');
+      else                    window.location.replace('profile.html');
+    }
+  })();
+
+  // ── Tab switching ─────────────────────────────────────────────────
+  function switchTab(tab) {
+    ['signin', 'signup'].forEach(function (t) {
+      var cap = t.charAt(0).toUpperCase() + t.slice(1);
+      document.getElementById('tab'   + cap).classList.toggle('active', t === tab);
+      document.getElementById('panel' + cap).classList.toggle('active', t === tab);
+    });
+    clearAlert();
+  }
+
+  function showAlert(msg, type) {
+    var el = document.getElementById('authAlert');
+    el.textContent = msg;
+    el.className   = 'auth-alert ' + type;
+  }
+  function clearAlert() {
+    var el = document.getElementById('authAlert');
+    el.className   = 'auth-alert';
+    el.textContent = '';
+  }
+  function shakeBox() {
+    var box = document.querySelector('.auth-box');
+    box.classList.remove('shake');
+    void box.offsetWidth;
+    box.classList.add('shake');
+  }
+  function setLoading(btnId, on) {
+    document.getElementById(btnId).classList.toggle('loading', on);
+  }
+
+  // ── Cinematic transition ──────────────────────────────────────────
+  function playCinematicThenGo(dest) {
+    var el = document.getElementById('cinematic');
+    el.classList.add('active');
+    setTimeout(function () { el.classList.add('curtain-up'); }, 200);
+    setTimeout(function () { el.classList.add('curtain-recede'); }, 2050);
+    setTimeout(function () { window.location.replace(dest); }, 2700);
+  }
+
+  // ── Sign In (calls MongoDB backend) ──────────────────────────────
+  async function handleSignIn() {
+    var email    = document.getElementById('siEmail').value;
+    var password = document.getElementById('siPassword').value;
+    setLoading('btnSignIn', true);
+
+    try {
+      var result = await authSignIn(email, password);
+      if (!result.ok) {
+        setLoading('btnSignIn', false);
+        showAlert(result.error, 'error');
+        shakeBox();
+        return;
+      }
+      playCinematicThenGo('profile.html');
+    } catch (err) {
+      setLoading('btnSignIn', false);
+      showAlert('Cannot connect to server. Make sure it is running on port 5000.', 'error');
+      shakeBox();
+    }
+  }
+
+  // ── Sign Up (calls MongoDB backend) ──────────────────────────────
+  async function handleSignUp() {
+    var name    = document.getElementById('suName').value;
+    var email   = document.getElementById('suEmail').value;
+    var pw      = document.getElementById('suPassword').value;
+    var confirm = document.getElementById('suConfirm').value;
+    var agreed  = document.getElementById('agreeTerms').checked;
+    setLoading('btnSignUp', true);
+
+    try {
+      var result = await authSignUp(name, email, pw, confirm, agreed);
+      setLoading('btnSignUp', false);
+      if (!result.ok) {
+        showAlert(result.error, 'error');
+        shakeBox();
+        return;
+      }
+      switchTab('signin');
+      showAlert('Account created for ' + result.name + '. You can now sign in.', 'success');
+      document.getElementById('siEmail').value = email;
+    } catch (err) {
+      setLoading('btnSignUp', false);
+      showAlert('Cannot connect to server. Make sure it is running on port 5000.', 'error');
+      shakeBox();
+    }
+  }
+
+  // ── Password strength ────────────────────────────────────────────
+  function updateStrength(pw) {
+    var lvl  = getPasswordStrength(pw);
+    var fill = document.getElementById('strengthFill');
+    var lbl  = document.getElementById('strengthLabel');
+    fill.style.width      = lvl.pct;
+    fill.style.background = lvl.color;
+    lbl.textContent       = lvl.text;
+    lbl.style.color       = lvl.color;
+  }
+</script>
+</body>
+</html>
