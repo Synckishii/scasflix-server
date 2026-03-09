@@ -3,7 +3,7 @@
  * SCASFLIX — Main Frontend Logic (TMDB + MongoDB version)
  */
 
-var API_BASE = 'http://localhost:5000/api';
+var API_BASE = 'https://scasflix-server.onrender.com/api';
 var IMG_BASE = 'https://image.tmdb.org/t/p/w300';
 
 // ═══════════════════════════════════════════════════════════════════
