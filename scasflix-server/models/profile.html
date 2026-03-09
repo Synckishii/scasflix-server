@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCASFLIX — Who's Watching?</title>
+  <link rel="stylesheet" href="profile.css">
+</head>
+<body>
+
+<a class="profile-brand" href="index.html">SCASFLIX</a>
+
+<h1 class="profile-title">Who's Watching?</h1>
+<p  class="profile-subtitle" id="pageSubtitle">Choose your profile to continue</p>
+<p  class="manage-hint" id="manageHint">Click the ✏️ icon on any profile to rename or lock it</p>
+
+<div class="profiles-grid" id="profilesGrid">
+  <!-- Rendered by profile.js -->
+</div>
+
+<div class="profile-actions">
+  <button class="btn-enter"  id="btnEnter"  onclick="enterWithProfile()">Let's Watch</button>
+  <button class="btn-manage" id="btnManage" onclick="toggleManageMode()">Manage Profiles</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MANAGE MODAL  (rename + lock tabs)
+════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="manageModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeManageModal()">&#x2715;</button>
+
+    <div class="modal-avatar-preview" id="manageModalAvatar"></div>
+
+    <!-- Tabs -->
+    <div class="modal-tabs">
+      <div class="modal-tab active" data-tab="rename" onclick="switchManageTab('rename')">Rename</div>
+      <div class="modal-tab"        data-tab="lock"   onclick="switchManageTab('lock')">Profile Lock</div>
+    </div>
+
+    <!-- Rename panel -->
+    <div class="modal-panel active" data-panel="rename">
+      <input class="modal-input" id="renameInput" type="text" maxlength="30"
+             placeholder="Profile name"
+             oninput="updateCharCount()"
+             onkeydown="if(event.key==='Enter') saveRename()">
+      <div class="modal-char-count"><span id="charCount">0</span> / 30</div>
+      <div class="modal-error" id="renameError"></div>
+      <div class="modal-actions">
+        <button class="btn-modal-primary"   onclick="saveRename()">Save Name</button>
+        <button class="btn-modal-secondary" onclick="closeManageModal()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Lock panel -->
+    <div class="modal-panel" data-panel="lock">
+      <div id="lockTabContent">
+        <!-- Rendered dynamically by profile.js renderLockTab() -->
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script src="profile.js"></script>
+</body>
+</html>
