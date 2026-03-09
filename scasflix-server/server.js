@@ -2,7 +2,7 @@
  * server.js
  * SCASFLIX — Main Express Server
  */
-
+const PORT = process.env.PORT || 10000;
 const express  = require('express');
 const mongoose = require('mongoose');
 const cors     = require('cors');
