@@ -1,6 +1,7 @@
 /**
  * script.js
  * SCASFLIX — Main Frontend Logic (TMDB + MongoDB version)
+ * Enhanced with Top 10 Picks and full functionality
  */
 
 var API_BASE = 'https://scasflix-server.onrender.com/api';
@@ -13,13 +14,6 @@ var IMG_BASE = 'https://image.tmdb.org/t/p/w300';
 async function loadTMDBSection(endpoint, gridId) {
   var grid = document.getElementById(gridId);
   if (!grid) return;
-
-  // Show skeleton loading
-  grid.innerHTML = Array(4).fill(
-    '<div class="movie-card" style="background:#1c1c1c;min-height:280px;border-radius:8px;animation:pulse 1.5s infinite;">' +
-    '<div style="width:100%;height:100%;background:linear-gradient(90deg,#1c1c1c 25%,#2a2a2a 50%,#1c1c1c 75%);background-size:200%;animation:shimmer 1.5s infinite;"></div>' +
-    '</div>'
-  ).join('');
 
   try {
     var res   = await fetch(API_BASE + '/tmdb/' + endpoint);
@@ -44,80 +38,54 @@ async function loadTMDBSection(endpoint, gridId) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  HERO CAROUSEL — Load from TMDB
+//  TOP 10 PICKS LOADER
 // ═══════════════════════════════════════════════════════════════════
 
-async function loadHeroSlides() {
+async function loadTop10Picks() {
+  var grid = document.getElementById('gridTop10');
+  if (!grid) return;
+
   try {
-    var res   = await fetch(API_BASE + '/tmdb/hero');
-    var items = await res.json();
-    if (!Array.isArray(items) || items.length === 0) return;
-
-    var heroSection = document.querySelector('.hero-section');
-    if (!heroSection) return;
-
-    // Remove existing static slides
-    heroSection.querySelectorAll('.hero-slide').forEach(function(s) { s.remove(); });
-    heroSection.querySelectorAll('.hero-dots').forEach(function(d) { d.remove(); });
-
-    // Build slides
-    items.forEach(function(item, idx) {
-      var slide = document.createElement('div');
-      slide.className = 'hero-slide';
-      slide.id        = 'hs' + (idx + 1);
-      slide.style.backgroundImage = [
-        'linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 50%, transparent 100%)',
-        'linear-gradient(to top, rgba(20,20,20,1) 0%, transparent 30%, rgba(0,0,0,0.3) 100%)',
-        'url("' + item.backdropUrl + '")'
-      ].join(', ');
-      slide.style.backgroundSize     = 'cover';
-      slide.style.backgroundPosition = 'center';
-
-      slide.innerHTML =
-        '<div class="container">' +
-          '<div class="col-content">' +
-            '<h1>' + esc(item.title) + '</h1>' +
-            '<div class="hero-badges">' +
-              '<span class="badge-match">' + esc(item.score) + '</span>' +
-              '<span class="badge-meta">'  + esc(item.year)  + '</span>' +
-              '<span class="badge-meta">'  + esc(item.genre) + '</span>' +
-              '<span class="badge-qual">HD</span>' +
-            '</div>' +
-            '<p class="lead">' + esc(item.overview) + '</p>' +
-            '<div class="hero-btns">' +
-              '<button class="btn-play" onclick="handleHeroPlay(\'' + esc(item.title) + '\')">' +
-                '<svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/></svg>' +
-                ' Play' +
-              '</button>' +
-              '<button class="btn-info" onclick="handleHeroInfo(' + item.id + ',\'' + item.mediaType + '\')">' +
-                '<svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>' +
-                ' More Info' +
-              '</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>';
-
-      // Insert before the arrow buttons
-      var prevBtn = heroSection.querySelector('.hero-prev');
-      heroSection.insertBefore(slide, prevBtn || null);
+    // Load popular movies and TV shows, then combine and sort by rating
+    var moviesRes = await fetch(API_BASE + '/tmdb/popular-movies');
+    var tvRes = await fetch(API_BASE + '/tmdb/popular-tv');
+    
+    var movies = await moviesRes.json();
+    var tvShows = await tvRes.json();
+    
+    var combined = [...movies, ...tvShows];
+    
+    // Sort by score (rating) descending
+    combined.sort((a, b) => {
+      var scoreA = parseFloat(a.score) || 0;
+      var scoreB = parseFloat(b.score) || 0;
+      return scoreB - scoreA;
     });
 
-    // Build dots
-    var dotsDiv = document.createElement('div');
-    dotsDiv.className = 'hero-dots';
-    items.forEach(function(_, idx) {
-      var dot    = document.createElement('button');
-      dot.className = 'hero-dot';
-      dot.setAttribute('onclick', 'carouselGoSlide(' + idx + ')');
-      dotsDiv.appendChild(dot);
-    });
-    heroSection.appendChild(dotsDiv);
+    var top10 = combined.slice(0, 10);
 
-    // Re-init carousel
-    if (typeof initCarousel === 'function') initCarousel(items.length);
+    if (top10.length === 0) {
+      grid.innerHTML = '<p style="color:#555;padding:20px;">No content available.</p>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    for (var i = 0; i < top10.length; i++) {
+      var item = top10[i];
+      var inList = typeof isInList === 'function' ? await isInList(item.tmdbId) : false;
+      var card = buildMovieCard(item, inList);
+      // Add ranking badge
+      var rankBadge = document.createElement('div');
+      rankBadge.style.cssText = 'position:absolute;top:10px;left:10px;background:#f39c12;color:#000;padding:4px 8px;border-radius:4px;font-weight:700;font-size:0.9rem;z-index:5;';
+      rankBadge.textContent = '#' + (i + 1);
+      card.style.position = 'relative';
+      card.appendChild(rankBadge);
+      grid.appendChild(card);
+    }
 
   } catch (err) {
-    console.warn('Hero slide TMDB load failed, keeping static slides:', err);
+    console.error('Top 10 load error:', err);
+    grid.innerHTML = '<p style="color:#555;padding:20px;">Could not load Top 10. Is the server running?</p>';
   }
 }
 
@@ -190,7 +158,7 @@ async function toggleListBtn(btn) {
   }
 }
 
-// ── Re-wire static add-list buttons (for any remaining static HTML cards) ──
+// ── Re-wire static add-list buttons ──
 function initListButtons() {
   var btns = document.querySelectorAll('.add-list-btn[data-title]');
   btns.forEach(function(btn) {
@@ -198,36 +166,6 @@ function initListButtons() {
     btn._wired = true;
     btn.addEventListener('click', function() { toggleListBtn(btn); });
   });
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  HERO PLAY / INFO HANDLERS
-// ═══════════════════════════════════════════════════════════════════
-
-function handleHeroPlay(title) {
-  alert('▶ Now Playing: ' + title + '\nEnjoy the show on SCASFLIX!');
-}
-
-async function handleHeroInfo(id, type) {
-  try {
-    var res  = await fetch(API_BASE + '/tmdb/detail/' + type + '/' + id);
-    var data = await res.json();
-    var title   = data.title || data.name;
-    var year    = (data.release_date || data.first_air_date || '').slice(0, 4);
-    var rating  = data.vote_average ? data.vote_average.toFixed(1) + '/10' : 'N/A';
-    var seasons = data.number_of_seasons ? data.number_of_seasons + ' Season(s)' : '';
-    var genres  = (data.genres || []).map(function(g){ return g.name; }).join(', ');
-    alert(
-      'ℹ️ ' + title + '\n\n' +
-      '📅 Year: '    + year    + '\n' +
-      '⭐ Rating: '  + rating  + '\n' +
-      (seasons ? '📺 Seasons: ' + seasons + '\n' : '') +
-      '🎬 Genre: '   + genres  + '\n\n' +
-      data.overview
-    );
-  } catch (err) {
-    alert('Could not load info. Please try again.');
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -255,7 +193,6 @@ async function runSearch() {
       return;
     }
 
-    // Build a simple search results modal
     showSearchResults(query, items);
     if (searchInput) searchInput.value = '';
 
@@ -265,7 +202,6 @@ async function runSearch() {
 }
 
 function showSearchResults(query, items) {
-  // Remove existing modal
   var existing = document.getElementById('searchModal');
   if (existing) existing.remove();
 
@@ -278,7 +214,7 @@ function showSearchResults(query, items) {
   var cardsHTML = items.map(function(item) {
     return (
       '<div style="background:#1c1c1c;border-radius:8px;overflow:hidden;cursor:pointer;" ' +
-           'onclick="handleHeroInfo(' + item.tmdbId + ',\'' + item.mediaType + '\')">' +
+           'onclick="handleHeroInfo(' + item.id + ',\'' + item.mediaType + '\')">' +
         '<img src="' + esc(item.posterUrl) + '" alt="' + esc(item.title) + '" ' +
              'style="width:100%;display:block;" loading="lazy">' +
         '<div style="padding:10px;">' +
@@ -320,17 +256,12 @@ if (searchBtn) {
 
 document.addEventListener('DOMContentLoaded', async function() {
   // Load TMDB content into grids
-  // Make sure your index.html section grids have these IDs:
-  //   id="gridTrending"  id="gridStudentPicks"  id="gridPopular"
   await Promise.all([
     loadTMDBSection('trending',       'gridTrending'),
+    loadTop10Picks(),
     loadTMDBSection('anime',          'gridStudentPicks'),
     loadTMDBSection('popular-movies', 'gridPopular')
   ]);
 
-  // Load dynamic hero slides (optional — comment out to keep static)
-  // await loadHeroSlides();
-
-  // Wire any static list buttons
   initListButtons();
 });
