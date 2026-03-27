@@ -1,6 +1,7 @@
 /**
  * routes/tmdb.js
  * SCASFLIX — TMDB API Proxy Routes
+ * FIXED: Return MORE movies (20+) instead of limiting to 8
  */
 
 const express = require('express');
@@ -66,49 +67,57 @@ function formatItem(item) {
 
 // ── Routes ───────────────────────────────────────────────────────────
 
-// GET /api/tmdb/trending
+// GET /api/tmdb/trending — Return 20 trending items
 router.get('/trending', async (req, res) => {
   try {
     const data = await tmdbFetch('/trending/all/week?language=en-US');
-    res.json(data.results.slice(0, 8).map(formatItem));
+    // Return up to 20 items (was 8)
+    res.json(data.results.slice(0, 20).map(formatItem));
   } catch (err) {
+    console.error('Trending error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/tmdb/popular-tv
+// GET /api/tmdb/popular-tv — Return 20 TV shows
 router.get('/popular-tv', async (req, res) => {
   try {
     const data = await tmdbFetch('/tv/popular?language=en-US&page=1');
-    res.json(data.results.slice(0, 8).map(i => formatItem({ ...i, media_type: 'tv' })));
+    // Return up to 20 items (was 8)
+    res.json(data.results.slice(0, 20).map(i => formatItem({ ...i, media_type: 'tv' })));
   } catch (err) {
+    console.error('Popular TV error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/tmdb/popular-movies
+// GET /api/tmdb/popular-movies — Return 20 movies
 router.get('/popular-movies', async (req, res) => {
   try {
     const data = await tmdbFetch('/movie/popular?language=en-US&page=1');
-    res.json(data.results.slice(0, 8).map(i => formatItem({ ...i, media_type: 'movie' })));
+    // Return up to 20 items (was 8)
+    res.json(data.results.slice(0, 20).map(i => formatItem({ ...i, media_type: 'movie' })));
   } catch (err) {
+    console.error('Popular movies error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/tmdb/anime
+// GET /api/tmdb/anime — Return 20 anime
 router.get('/anime', async (req, res) => {
   try {
     const data = await tmdbFetch(
       '/discover/tv?with_genres=16&sort_by=popularity.desc&language=en-US&page=1&with_origin_country=JP'
     );
-    res.json(data.results.slice(0, 8).map(i => formatItem({ ...i, media_type: 'tv' })));
+    // Return up to 20 items (was 8)
+    res.json(data.results.slice(0, 20).map(i => formatItem({ ...i, media_type: 'tv' })));
   } catch (err) {
+    console.error('Anime error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/tmdb/hero  — 5 curated items for hero carousel
+// GET /api/tmdb/hero — 5 curated items for hero carousel
 router.get('/hero', async (req, res) => {
   try {
     const data = await tmdbFetch('/trending/all/week?language=en-US');
@@ -133,11 +142,12 @@ router.get('/hero', async (req, res) => {
       });
     res.json(items);
   } catch (err) {
+    console.error('Hero error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/tmdb/search?q=...
+// GET /api/tmdb/search?q=... — Search and return results
 router.get('/search', async (req, res) => {
   const query = req.query.q;
   if (!query) return res.status(400).json({ error: 'Query parameter ?q= is required' });
@@ -147,10 +157,11 @@ router.get('/search', async (req, res) => {
     );
     const results = data.results
       .filter(i => i.media_type !== 'person' && i.poster_path)
-      .slice(0, 12)
+      .slice(0, 20)  // Return up to 20 search results (was 12)
       .map(formatItem);
     res.json(results);
   } catch (err) {
+    console.error('Search error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -165,6 +176,7 @@ router.get('/detail/:type/:id', async (req, res) => {
     const data = await tmdbFetch(`/${type}/${id}?language=en-US&append_to_response=credits`);
     res.json(data);
   } catch (err) {
+    console.error('Detail error:', err);
     res.status(500).json({ error: err.message });
   }
 });
