@@ -2,6 +2,7 @@
  * pin.js
  * SCASFLIX — PIN entry page logic
  * Depends on: auth.js
+ * FIXED: Async PIN verification with proper await
  */
 
 /* ── Guard: must have an account and a pending slot ── */
@@ -113,21 +114,38 @@ function refreshBoxes() {
   });
 }
 
-function submitPin() {
+/* ── FIXED: Make submitPin async and await PIN verification ── */
+async function submitPin() {
   if (checkLockout()) return;
 
-  var result = verifyProfilePin(targetSlot, pinValue);
+  // Disable input while verifying
+  var input = document.getElementById('pinRealInput');
+  input.disabled = true;
 
-  if (result.ok) {
-    /* ✅ Correct — clear attempts, set profile, go to selector (which will select the slot) */
-    resetAttempts();
-    sessionStorage.removeItem(PENDING_KEY);
-    setActiveProfile(profile);
-    window.location.replace('index.html?welcome=1');
+  try {
+    // AWAIT the async PIN verification
+    var result = await verifyProfilePin(targetSlot, pinValue);
+
+    if (result.ok) {
+      /* ✅ Correct PIN — clear attempts, set profile, go to home */
+      resetAttempts();
+      sessionStorage.removeItem(PENDING_KEY);
+      setActiveProfile(profile);
+      showToast('Welcome back, ' + profile.name + '! 🎬', 'success');
+      setTimeout(function() {
+        window.location.replace('index.html?welcome=1');
+      }, 500);
+      return;
+    }
+  } catch (err) {
+    console.error('PIN verification error:', err);
+    showToast('Error verifying PIN. Please try again.', 'error');
+    input.disabled = false;
     return;
   }
 
   /* ❌ Wrong PIN */
+  input.disabled = false;
   var d = getAttemptData();
   d.count++;
   var remaining = MAX_ATTEMPTS - d.count;
@@ -136,6 +154,7 @@ function submitPin() {
     d.lockedUntil = Date.now() + LOCKOUT_MS;
     saveAttemptData(d);
     shakePinBoxes();
+    showToast('Too many attempts! Please wait 30 seconds.', 'error');
     showLockedState(d.lockedUntil);
     return;
   }
@@ -148,6 +167,8 @@ function submitPin() {
 
   /* Shake and clear */
   shakePinBoxes();
+  showToast('Incorrect PIN. ' + remaining + ' attempt' + (remaining===1?'':'s') + ' remaining.', 'error');
+  
   setTimeout(function() {
     pinValue = '';
     document.getElementById('pinRealInput').value = '';
