@@ -9,6 +9,7 @@
     .mylist-header { padding: 120px 40px 32px; }
     .mylist-header h2 { font-size: 2rem; font-weight: 900; color: #fff; margin-bottom: 6px; }
     .mylist-header p  { color: #888; font-size: 0.95rem; }
+    
     .mylist-empty {
       text-align: center; padding: 80px 20px; color: #555;
     }
@@ -22,7 +23,82 @@
       transition: background 0.2s;
     }
     .mylist-empty a:hover { background: #c40812; }
-    .mylist-grid-wrap { padding: 0 40px 60px; }
+
+    /* Horizontal scroll section for My List */
+    .mylist-scroll-section {
+      padding: 0 40px 60px;
+      position: relative;
+    }
+
+    .mylist-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 0 40px;
+    }
+
+    .mylist-section-header h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #fff;
+      margin: 0;
+    }
+
+    .mylist-scroll-controls {
+      display: flex;
+      gap: 10px;
+    }
+
+    .mylist-scroll-arrow {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+      cursor: pointer;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      font-weight: 700;
+    }
+
+    .mylist-scroll-arrow:hover:not(.disabled) {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.5);
+      transform: scale(1.1);
+    }
+
+    .mylist-scroll-arrow:active:not(.disabled) {
+      transform: scale(0.95);
+    }
+
+    .mylist-scroll-arrow.disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .mylist-grid-scroll {
+      padding: 0 40px;
+      overflow-x: auto;
+      scroll-behavior: smooth;
+      display: flex;
+      gap: 16px;
+      scrollbar-width: none;
+    }
+
+    .mylist-grid-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .mylist-grid-scroll .movie-card {
+      flex: 0 0 200px;
+      min-height: 320px;
+    }
+
     .btn-remove-list {
       margin-top: 8px; padding: 5px 12px;
       background: transparent; color: #e57373;
@@ -31,8 +107,20 @@
       transition: all 0.2s; display: block; width: 100%;
     }
     .btn-remove-list:hover { background: #4a1a1a; border-color: #e57373; }
+
     @media (max-width: 600px) {
-      .mylist-header, .mylist-grid-wrap { padding-left: 16px; padding-right: 16px; }
+      .mylist-header, .mylist-scroll-section, .mylist-section-header {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+      .mylist-grid-scroll {
+        padding: 0 16px;
+      }
+      .mylist-scroll-arrow {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+      }
     }
   </style>
 </head>
@@ -53,7 +141,8 @@
         style="background:#1e1e1e;border:1px solid #444;border-radius:4px;padding:5px 10px;color:#fff;font-size:0.85rem;width:160px;outline:none;"
         onfocus="this.style.borderColor='#e50914'" onblur="this.style.borderColor='#444'">
       <button id="navSearchBtn"
-        style="background:#e50914;border:none;border-radius:4px;padding:5px 10px;color:#fff;cursor:pointer;font-size:0.85rem;">&#128269;</button>
+        style="background:#e50914;border:none;border-radius:4px;padding:5px 10px;color:#fff;cursor:pointer;font-size:0.85rem;transition:background 0.2s;"
+        onmouseover="this.style.background='#c40812'" onmouseout="this.style.background='#e50914'">🔍</button>
     </li>
     <li id="navAuthArea"></li>
   </ul>
@@ -64,8 +153,16 @@
   <p id="myListCount">Loading...</p>
 </div>
 
-<div class="mylist-grid-wrap">
-  <div class="cards-grid" id="myListGrid"></div>
+<!-- Scrollable My List -->
+<div class="mylist-scroll-section">
+  <div class="mylist-section-header" style="margin-bottom: 20px;">
+    <h3 id="myListTitle">Your Saved Titles</h3>
+    <div class="mylist-scroll-controls">
+      <button class="mylist-scroll-arrow" id="myListPrev" onclick="scrollMyList(-300)">❮</button>
+      <button class="mylist-scroll-arrow" id="myListNext" onclick="scrollMyList(300)">❯</button>
+    </div>
+  </div>
+  <div class="mylist-grid-scroll" id="myListGrid"></div>
   <div class="mylist-empty" id="myListEmpty" style="display:none;">
     <svg viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
     <h3>Your list is empty</h3>
@@ -81,24 +178,51 @@
     document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 50);
   });
 
+  function scrollMyList(distance) {
+    var grid = document.getElementById('myListGrid');
+    if (grid) {
+      grid.scrollBy({ left: distance, behavior: 'smooth' });
+      setTimeout(updateMyListButtons, 300);
+    }
+  }
+
+  function updateMyListButtons() {
+    var grid = document.getElementById('myListGrid');
+    var prevBtn = document.getElementById('myListPrev');
+    var nextBtn = document.getElementById('myListNext');
+    
+    if (prevBtn) prevBtn.classList.toggle('disabled', grid.scrollLeft <= 0);
+    if (nextBtn) nextBtn.classList.toggle('disabled', grid.scrollLeft >= grid.scrollWidth - grid.clientWidth - 10);
+  }
+
   async function renderMyList() {
     var grid  = document.getElementById('myListGrid');
     var empty = document.getElementById('myListEmpty');
     var count = document.getElementById('myListCount');
+    var title = document.getElementById('myListTitle');
 
     count.textContent = 'Loading...';
     grid.innerHTML    = '';
+
+    var profile = getActiveProfile();
+    if (!profile) {
+      count.textContent = 'No profile selected';
+      empty.style.display = 'block';
+      return;
+    }
 
     var list = await getMyList();
 
     if (!list || list.length === 0) {
       empty.style.display = 'block';
       count.textContent   = '';
+      title.textContent = 'Your Saved Titles';
       return;
     }
 
     empty.style.display = 'none';
     count.textContent   = list.length + ' title' + (list.length === 1 ? '' : 's') + ' saved';
+    title.textContent = 'Your Saved Titles (' + list.length + ')';
 
     list.forEach(function(item) {
       var card = document.createElement('div');
@@ -107,8 +231,8 @@
         '<img src="' + (item.posterUrl || '') + '" alt="' + esc(item.title) + '" loading="lazy">' +
         '<div class="movie-card-body">' +
           '<h6>' + esc(item.title) + '</h6>' +
-          '<p>'  + esc(item.genre || '') + '</p>' +
-          '<span class="badge-sm">' + esc(item.score || '') + '</span>' +
+          '<p>'  + esc(item.genre || 'Unknown Genre') + '</p>' +
+          '<span class="badge-sm">' + esc(item.score || 'N/A') + '</span>' +
           '<button class="btn-remove-list" data-tmdbid="' + item.tmdbId + '" data-title="' + esc(item.title) + '">✕ Remove</button>' +
         '</div>';
       grid.appendChild(card);
@@ -123,9 +247,18 @@
         renderMyList();
       });
     });
+
+    setTimeout(updateMyListButtons, 300);
   }
 
   document.addEventListener('DOMContentLoaded', renderMyList);
+
+  // Re-render when returning to this page
+  window.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+      renderMyList();
+    }
+  });
 </script>
 
 </body>
