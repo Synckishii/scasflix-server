@@ -1,6 +1,7 @@
 /**
  * routes/profiles.js
  * SCASFLIX — Profile Management Routes (requires JWT)
+ * FIXED: Proper PIN hashing and validation
  */
 
 const express = require('express');
@@ -16,8 +17,18 @@ router.get('/', async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select('profiles');
     if (!user) return res.status(404).json({ error: 'User not found.' });
-    res.json(user.profiles);
+    
+    // Don't send PIN hashes to client
+    const safeProfiles = user.profiles.map(p => ({
+      slot: p.slot,
+      name: p.name,
+      color: p.color,
+      locked: p.locked
+    }));
+    
+    res.json(safeProfiles);
   } catch (err) {
+    console.error('Profiles GET error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -26,22 +37,32 @@ router.get('/', async (req, res) => {
 router.put('/:slot/rename', async (req, res) => {
   try {
     let { name } = req.body;
+    const slot = parseInt(req.params.slot);
     name = (name || '').trim();
 
-    if (!name)          return res.status(400).json({ error: 'Name cannot be empty.' });
+    if (!name)            return res.status(400).json({ error: 'Name cannot be empty.' });
     if (name.length > 30) return res.status(400).json({ error: 'Name must be 30 characters or fewer.' });
 
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
 
-    const profile = user.profiles.find(p => p.slot === parseInt(req.params.slot));
+    const profile = user.profiles.find(p => p.slot === slot);
     if (!profile) return res.status(404).json({ error: 'Profile not found.' });
 
     profile.name = name;
     await user.save();
 
-    res.json({ ok: true, profiles: user.profiles });
+    // Return safe profiles (without PIN hashes)
+    const safeProfiles = user.profiles.map(p => ({
+      slot: p.slot,
+      name: p.name,
+      color: p.color,
+      locked: p.locked
+    }));
+
+    res.json({ ok: true, profiles: safeProfiles });
   } catch (err) {
+    console.error('Rename error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -50,6 +71,7 @@ router.put('/:slot/rename', async (req, res) => {
 router.put('/:slot/pin', async (req, res) => {
   try {
     const { newPin, currentPin } = req.body;
+    const slot = parseInt(req.params.slot);
 
     if (!/^\d{4}$/.test(newPin)) {
       return res.status(400).json({ error: 'PIN must be exactly 4 digits.' });
@@ -58,20 +80,38 @@ router.put('/:slot/pin', async (req, res) => {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
 
-    const profile = user.profiles.find(p => p.slot === parseInt(req.params.slot));
+    const profile = user.profiles.find(p => p.slot === slot);
     if (!profile) return res.status(404).json({ error: 'Profile not found.' });
 
-    // If PIN already exists, verify current first
-    if (profile.pin && profile.pin !== currentPin) {
-      return res.status(401).json({ error: 'Current PIN is incorrect.' });
+    // If PIN already exists, verify current PIN first
+    if (profile.pin) {
+      if (!currentPin) {
+        return res.status(401).json({ error: 'Current PIN is required to change PIN.' });
+      }
+      const pinMatch = await bcrypt.compare(currentPin, profile.pin);
+      if (!pinMatch) {
+        return res.status(401).json({ error: 'Current PIN is incorrect.' });
+      }
     }
 
-    profile.pin    = newPin;
+    // Hash the new PIN
+    const hashedPin = await bcrypt.hash(newPin, 10);
+
+    profile.pin    = hashedPin;
     profile.locked = true;
     await user.save();
 
-    res.json({ ok: true, profiles: user.profiles });
+    // Return safe profiles
+    const safeProfiles = user.profiles.map(p => ({
+      slot: p.slot,
+      name: p.name,
+      color: p.color,
+      locked: p.locked
+    }));
+
+    res.json({ ok: true, profiles: safeProfiles });
   } catch (err) {
+    console.error('PIN set error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -80,17 +120,21 @@ router.put('/:slot/pin', async (req, res) => {
 router.delete('/:slot/pin', async (req, res) => {
   try {
     const { currentPin } = req.body;
+    const slot = parseInt(req.params.slot);
 
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
 
-    const profile = user.profiles.find(p => p.slot === parseInt(req.params.slot));
+    const profile = user.profiles.find(p => p.slot === slot);
     if (!profile) return res.status(404).json({ error: 'Profile not found.' });
 
     if (!profile.pin) {
       return res.status(400).json({ error: 'This profile has no PIN set.' });
     }
-    if (profile.pin !== currentPin) {
+
+    // Verify current PIN
+    const pinMatch = await bcrypt.compare(currentPin, profile.pin);
+    if (!pinMatch) {
       return res.status(401).json({ error: 'Incorrect PIN.' });
     }
 
@@ -98,8 +142,17 @@ router.delete('/:slot/pin', async (req, res) => {
     profile.locked = false;
     await user.save();
 
-    res.json({ ok: true, profiles: user.profiles });
+    // Return safe profiles
+    const safeProfiles = user.profiles.map(p => ({
+      slot: p.slot,
+      name: p.name,
+      color: p.color,
+      locked: p.locked
+    }));
+
+    res.json({ ok: true, profiles: safeProfiles });
   } catch (err) {
+    console.error('PIN remove error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -108,18 +161,32 @@ router.delete('/:slot/pin', async (req, res) => {
 router.post('/:slot/verify-pin', async (req, res) => {
   try {
     const { pin } = req.body;
+    const slot = parseInt(req.params.slot);
+
+    if (!/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ error: 'PIN must be exactly 4 digits.' });
+    }
 
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
 
-    const profile = user.profiles.find(p => p.slot === parseInt(req.params.slot));
+    const profile = user.profiles.find(p => p.slot === slot);
     if (!profile) return res.status(404).json({ error: 'Profile not found.' });
 
-    if (!profile.locked) return res.json({ ok: true }); // not locked
-    if (profile.pin === pin) return res.json({ ok: true });
+    // If not locked, allow access
+    if (!profile.locked || !profile.pin) {
+      return res.json({ ok: true });
+    }
+
+    // Verify PIN
+    const pinMatch = await bcrypt.compare(pin, profile.pin);
+    if (pinMatch) {
+      return res.json({ ok: true });
+    }
 
     res.status(401).json({ ok: false, error: 'Incorrect PIN. Please try again.' });
   } catch (err) {
+    console.error('PIN verify error:', err);
     res.status(500).json({ error: err.message });
   }
 });
