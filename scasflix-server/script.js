@@ -41,9 +41,10 @@ const elements = {
   authModal: document.getElementById('authModal'),
   movieModal: document.getElementById('movieModal'),
   videoModal: document.getElementById('videoModal'),
-  trendingRow: document.getElementById('trendingRow'),
-  popularRow: document.getElementById('popularRow'),
-  topRatedRow: document.getElementById('topRatedRow'),
+  // Updated to match actual index.html grid IDs
+  trendingRow: document.getElementById('gridTrending'),
+  popularRow: document.getElementById('gridPopular'),
+  topRatedRow: document.getElementById('gridStudentPicks'),
   myListRow: document.getElementById('myListRow'),
   myListSection: document.getElementById('myListSection'),
   emptyListState: document.getElementById('emptyListState'),
@@ -57,8 +58,8 @@ const elements = {
   heroGenre: document.getElementById('heroGenre'),
   loadingIndicator: document.getElementById('loadingIndicator'),
   toast: document.getElementById('toast'),
-  searchInput: document.getElementById('searchInput'),
-  searchBtn: document.getElementById('searchBtn'),
+  searchInput: document.getElementById('navSearchInput'),
+  searchBtn: document.getElementById('navSearchBtn'),
   loginEmail: document.getElementById('loginEmail'),
   loginPassword: document.getElementById('loginPassword'),
   registerName: document.getElementById('registerName'),
@@ -192,7 +193,7 @@ async function loadMovies() {
         ? trendingData
         : trendingData.results || [];
       renderMovieRow(
-        'trendingRow',
+        'gridTrending',
         appState.movies.trending,
         'trending'
       );
@@ -209,7 +210,7 @@ async function loadMovies() {
       appState.movies.popular = Array.isArray(popularData)
         ? popularData
         : popularData.results || [];
-      renderMovieRow('popularRow', appState.movies.popular, 'popular');
+      renderMovieRow('gridPopular', appState.movies.popular, 'popular');
     }
 
     // Load top rated movies
@@ -218,7 +219,7 @@ async function loadMovies() {
       appState.movies.topRated = Array.isArray(topRatedData)
         ? topRatedData
         : topRatedData.results || [];
-      renderMovieRow('topRatedRow', appState.movies.topRated, 'toprated');
+      renderMovieRow('gridStudentPicks', appState.movies.topRated, 'toprated');
     }
   } catch (error) {
     console.error('Error loading movies:', error);
@@ -234,11 +235,9 @@ function renderMovieRow(elementId, movies, category) {
   const element = document.getElementById(elementId);
   if (!element) return;
 
-  // Hide skeleton, show content
-  element.style.display = 'flex';
-  element.previousElementSibling.style.display = 'none';
-
+  // Clear skeleton cards and show real content
   element.innerHTML = '';
+  element.style.display = 'grid';
 
   if (!movies || movies.length === 0) {
     element.innerHTML =
@@ -256,9 +255,11 @@ function createMovieCard(movie) {
   const card = document.createElement('div');
   card.className = 'movie-card';
 
-  const posterUrl = movie.posterUrl || movie.poster_path
-    ? `https://image.tmdb.org/t/p/w200${movie.poster_path}`
-    : 'https://via.placeholder.com/200x300?text=No+Image';
+  const posterUrl = movie.posterUrl
+    ? movie.posterUrl
+    : movie.poster_path
+      ? `https://image.tmdb.org/t/p/w300${movie.poster_path}`
+      : 'https://via.placeholder.com/200x300?text=No+Image';
 
   const title = movie.title || movie.name || 'Unknown';
   const rating = movie.rating
@@ -291,11 +292,13 @@ function createMovieCard(movie) {
 }
 
 function setHeroMovie(movie) {
-  const posterUrl = movie.posterUrl || movie.backdrop_path
-    ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
-    : movie.poster_path
-      ? `https://image.tmdb.org/t/p/original${movie.poster_path}`
-      : 'https://via.placeholder.com/1400x400?text=Hero+Image';
+  const posterUrl = movie.backdropUrl
+    ? movie.backdropUrl
+    : movie.backdrop_path
+      ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
+      : movie.posterUrl
+        ? movie.posterUrl
+        : 'https://via.placeholder.com/1400x400?text=Hero+Image';
 
   elements.heroBackdrop.style.backgroundImage = `url('${posterUrl}')`;
   elements.heroTitle.textContent = movie.title || movie.name || 'Unknown';
@@ -329,13 +332,17 @@ function setHeroMovie(movie) {
 // ═══════════════════════════════════════════════════════════════════
 
 function openMovieModal(movie) {
-  const posterUrl = movie.posterUrl || movie.poster_path
-    ? `https://image.tmdb.org/t/p/w300${movie.poster_path}`
-    : 'https://via.placeholder.com/300x450?text=No+Image';
+  const posterUrl = movie.posterUrl
+    ? movie.posterUrl
+    : movie.poster_path
+      ? `https://image.tmdb.org/t/p/w300${movie.poster_path}`
+      : 'https://via.placeholder.com/300x450?text=No+Image';
 
-  const backdropUrl = movie.backdropUrl || movie.backdrop_path
-    ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
-    : '';
+  const backdropUrl = movie.backdropUrl
+    ? movie.backdropUrl
+    : movie.backdrop_path
+      ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
+      : '';
 
   document.getElementById('modalBackdrop').style.backgroundImage =
     `url('${backdropUrl}')`;
@@ -587,7 +594,7 @@ async function handleSearch() {
     showToast(`Found ${results.length} results for "${query}"`, 'success');
     
     // For demo, show in trending row
-    renderMovieRow('trendingRow', results, 'search');
+    renderMovieRow('gridTrending', results, 'search');
   } else {
     showToast(`No results found for "${query}"`, 'info');
   }
