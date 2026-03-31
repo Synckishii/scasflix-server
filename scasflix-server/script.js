@@ -1,178 +1,85 @@
 /* ═══════════════════════════════════════════════════════════════════
    SCASFLIX - STREAMING PLATFORM - JAVASCRIPT
+   Fixed: Works with actual index.html DOM structure
+   Lab 8: PHP fetch integration via api_movies.php
 ═══════════════════════════════════════════════════════════════════ */
-
-// ═══════════════════════════════════════════════════════════════════
-// CONFIGURATION
-// ═══════════════════════════════════════════════════════════════════
 
 const API_BASE = 'https://scasflix-server.onrender.com/api';
 // For local development, use: 'http://localhost:5000/api'
-
-const CONFIG = {
-  movieCardWidth: 200,
-  scrollAmount: 300,
-  animationDuration: 300,
-};
-
-// ═══════════════════════════════════════════════════════════════════
-// STATE MANAGEMENT
-// ═══════════════════════════════════════════════════════════════════
-
-let appState = {
-  isLoggedIn: false,
-  currentUser: null,
-  currentMovie: null,
-  myList: [],
-  movies: {
-    trending: [],
-    popular: [],
-    topRated: [],
-  },
-  isLoading: false,
-};
-
-// ═══════════════════════════════════════════════════════════════════
-// DOM ELEMENTS
-// ═══════════════════════════════════════════════════════════════════
-
-const elements = {
-  navbar: document.querySelector('.navbar'),
-  authModal: document.getElementById('authModal'),
-  movieModal: document.getElementById('movieModal'),
-  videoModal: document.getElementById('videoModal'),
-  // Updated to match actual index.html grid IDs
-  trendingRow: document.getElementById('gridTrending'),
-  popularRow: document.getElementById('gridPopular'),
-  topRatedRow: document.getElementById('gridStudentPicks'),
-  myListRow: document.getElementById('myListRow'),
-  myListSection: document.getElementById('myListSection'),
-  emptyListState: document.getElementById('emptyListState'),
-  heroContent: document.getElementById('heroContent'),
-  heroBackdrop: document.getElementById('heroBackdrop'),
-  heroTitle: document.getElementById('heroTitle'),
-  heroDescription: document.getElementById('heroDescription'),
-  heroPlayBtn: document.getElementById('heroPlayBtn'),
-  heroAddBtn: document.getElementById('heroAddBtn'),
-  heroRating: document.getElementById('heroRating'),
-  heroGenre: document.getElementById('heroGenre'),
-  loadingIndicator: document.getElementById('loadingIndicator'),
-  toast: document.getElementById('toast'),
-  searchInput: document.getElementById('navSearchInput'),
-  searchBtn: document.getElementById('navSearchBtn'),
-  loginEmail: document.getElementById('loginEmail'),
-  loginPassword: document.getElementById('loginPassword'),
-  registerName: document.getElementById('registerName'),
-  registerEmail: document.getElementById('registerEmail'),
-  registerPassword: document.getElementById('registerPassword'),
-  videoPlayer: document.getElementById('videoPlayer'),
-  videoTitle: document.getElementById('videoTitle'),
-  videoDescription: document.getElementById('videoDescription'),
-};
 
 // ═══════════════════════════════════════════════════════════════════
 // INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════
 
 document.addEventListener('DOMContentLoaded', () => {
-  initializeApp();
-  setupEventListeners();
+  setupSearch();
   loadMovies();
+  loadMoviesFromPHP(); // Lab 8: PHP fetch integration
 });
 
-function initializeApp() {
-  // Check if user is logged in (from localStorage)
-  const savedUser = localStorage.getItem('scasflix_user');
-  if (savedUser) {
-    appState.currentUser = JSON.parse(savedUser);
-    appState.isLoggedIn = true;
-    updateAuthUI();
-  }
+// ═══════════════════════════════════════════════════════════════════
+// SEARCH SETUP
+// ═══════════════════════════════════════════════════════════════════
 
-  // Load My List from localStorage
-  const savedList = localStorage.getItem('scasflix_mylist');
-  if (savedList) {
-    appState.myList = JSON.parse(savedList);
-  }
-}
+function setupSearch() {
+  var searchBtn   = document.getElementById('navSearchBtn');
+  var searchInput = document.getElementById('navSearchInput');
+  if (!searchBtn || !searchInput) return;
 
-function setupEventListeners() {
-  // Navbar scroll effect
-  window.addEventListener('scroll', handleNavbarScroll);
-
-  // Search functionality
-  elements.searchBtn.addEventListener('click', handleSearch);
-  elements.searchInput.addEventListener('keypress', (e) => {
+  searchBtn.addEventListener('click', handleSearch);
+  searchInput.addEventListener('keypress', function (e) {
     if (e.key === 'Enter') handleSearch();
   });
+}
 
-  // Modal close on escape
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeAuthModal();
-      closeMovieModal();
-      closeVideoModal();
-    }
-  });
+async function handleSearch() {
+  var searchInput = document.getElementById('navSearchInput');
+  if (!searchInput) return;
+  var query = searchInput.value.trim();
+  if (!query) { showToast('Please enter a search term.', 'error'); return; }
 
-  // Modal background click
-  elements.authModal.addEventListener('click', (e) => {
-    if (e.target === elements.authModal) closeAuthModal();
-  });
-
-  elements.movieModal.addEventListener('click', (e) => {
-    if (e.target === elements.movieModal) closeMovieModal();
-  });
-
-  elements.videoModal.addEventListener('click', (e) => {
-    if (e.target === elements.videoModal) closeVideoModal();
-  });
+  var results = await fetchFromAPI('/tmdb/search?q=' + encodeURIComponent(query));
+  if (results && results.length > 0) {
+    renderMovieRow('gridTrending', results);
+    showToast('Found ' + results.length + ' results for "' + query + '"', 'success');
+  } else {
+    showToast('No results found for "' + query + '"', 'info');
+  }
+  searchInput.value = '';
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// API FUNCTIONS
+// API — TMDB (via Express server)
 // ═══════════════════════════════════════════════════════════════════
 
 async function fetchFromAPI(endpoint) {
   try {
-    showLoading(true);
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      method: 'GET',
+    var response = await fetch(API_BASE + endpoint, {
+      method:  'GET',
       headers: { 'Content-Type': 'application/json' },
-      // Give Render extra time to wake up from cold start
-      signal: AbortSignal.timeout(15000)
+      signal:  AbortSignal.timeout(20000)
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    return await response.json();
 
-    const data = await response.json();
-    showLoading(false);
-    return data;
   } catch (error) {
     console.error('API Error on ' + endpoint + ':', error.message);
-    showLoading(false);
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
       showToast('Server is waking up... please refresh in 30 seconds.', 'error');
     } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-      showToast('Cannot reach server. Check your internet or Render deployment.', 'error');
-    } else {
-      showToast('Failed to load content: ' + error.message, 'error');
+      showToast('Cannot reach server. Check your connection.', 'error');
     }
     return null;
   }
 }
 
-// ── Render Wake-Up Ping ─────────────────────────────────────────────
-// Free Render instances sleep after 15min. This pings the server first
-// so it wakes up before the movie fetch.
+// Ping Render free tier to wake it up before fetching
 async function pingServer() {
   try {
-    const res = await fetch(API_BASE.replace('/api', '/'), {
+    var res = await fetch(API_BASE.replace('/api', '/'), {
       signal: AbortSignal.timeout(20000)
     });
-    console.log('Server ping status:', res.status);
     return res.ok;
   } catch (e) {
     console.warn('Server ping failed:', e.message);
@@ -182,487 +89,183 @@ async function pingServer() {
 
 async function loadMovies() {
   try {
-    // Ping the server first to wake it up (Render free tier cold start)
     showToast('Connecting to server...', 'info');
     await pingServer();
 
-    // Load trending movies
-    const trendingData = await fetchFromAPI('/tmdb/trending');
+    // Trending
+    var trendingData = await fetchFromAPI('/tmdb/trending');
     if (trendingData) {
-      appState.movies.trending = Array.isArray(trendingData)
-        ? trendingData
-        : trendingData.results || [];
-      renderMovieRow(
-        'gridTrending',
-        appState.movies.trending,
-        'trending'
-      );
-
-      // Set hero to first trending movie
-      if (appState.movies.trending.length > 0) {
-        setHeroMovie(appState.movies.trending[0]);
-      }
+      var trending = Array.isArray(trendingData) ? trendingData : (trendingData.results || []);
+      renderMovieRow('gridTrending', trending);
     }
 
-    // Load popular movies
-    const popularData = await fetchFromAPI('/tmdb/popular-movies');
+    // Popular Movies
+    var popularData = await fetchFromAPI('/tmdb/popular-movies');
     if (popularData) {
-      appState.movies.popular = Array.isArray(popularData)
-        ? popularData
-        : popularData.results || [];
-      renderMovieRow('gridPopular', appState.movies.popular, 'popular');
+      var popular = Array.isArray(popularData) ? popularData : (popularData.results || []);
+      renderMovieRow('gridPopular', popular);
     }
 
-    // Load top rated movies
-    const topRatedData = await fetchFromAPI('/tmdb/popular-tv');
-    if (topRatedData) {
-      appState.movies.topRated = Array.isArray(topRatedData)
-        ? topRatedData
-        : topRatedData.results || [];
-      renderMovieRow('gridStudentPicks', appState.movies.topRated, 'toprated');
+    // Popular TV / Student Picks
+    var tvData = await fetchFromAPI('/tmdb/popular-tv');
+    if (tvData) {
+      var tv = Array.isArray(tvData) ? tvData : (tvData.results || []);
+      renderMovieRow('gridStudentPicks', tv);
     }
+
   } catch (error) {
     console.error('Error loading movies:', error);
-    showToast('Failed to load movies. Please refresh the page.', 'error');
+    showToast('Failed to load movies. Please refresh.', 'error');
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// RENDERING FUNCTIONS
+// LAB 8 — PHP FETCH INTEGRATION (api_movies.php)
+// Task: fetch movies from PHP backend and display them in a section
 // ═══════════════════════════════════════════════════════════════════
 
-function renderMovieRow(elementId, movies, category) {
-  const element = document.getElementById(elementId);
+function loadMoviesFromPHP() {
+  var container = document.getElementById('php-movie-container');
+  if (!container) return; // Section not in index.html, skip silently
+
+  fetch('api_movies.php')
+    .then(function (response) {
+      if (!response.ok) throw new Error('Server responded with ' + response.status);
+      return response.json();
+    })
+    .then(function (data) {
+      container.innerHTML = '';
+      data.forEach(function (movie) {
+        var card = document.createElement('div');
+        card.className = 'movie-card';
+        card.innerHTML =
+          '<img src="' + movie.image + '" alt="' + movie.title + '" loading="lazy">' +
+          '<div class="movie-card-body">' +
+            '<h6>' + movie.title + '</h6>' +
+            '<p>' + movie.category + '</p>' +
+          '</div>';
+        container.appendChild(card);
+      });
+    })
+    .catch(function (error) {
+      console.error('Error fetching movies:', error);
+      // Lab 8 Assessment: Graceful error message for users
+      if (container) {
+        container.innerHTML =
+          '<p style="color:#b3b3b3;padding:2rem;grid-column:1/-1;">' +
+          'Sorry, the SCASFlix server is currently undergoing maintenance. ' +
+          'Please try again later.</p>';
+      }
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════════════════════════
+
+function renderMovieRow(elementId, movies) {
+  var element = document.getElementById(elementId);
   if (!element) return;
 
-  // Clear skeleton cards and show real content
   element.innerHTML = '';
-  element.style.display = 'grid';
 
   if (!movies || movies.length === 0) {
-    element.innerHTML =
-      '<p style="color: #b3b3b3; padding: 2rem;">No movies found</p>';
+    element.innerHTML = '<p style="color:#b3b3b3;padding:2rem;">No movies found</p>';
     return;
   }
 
-  movies.forEach((movie) => {
-    const card = createMovieCard(movie);
-    element.appendChild(card);
+  movies.forEach(function (movie) {
+    element.appendChild(createMovieCard(movie));
   });
 }
 
 function createMovieCard(movie) {
-  const card = document.createElement('div');
+  var card = document.createElement('div');
   card.className = 'movie-card';
 
-  const posterUrl = movie.posterUrl
+  var posterUrl = movie.posterUrl
     ? movie.posterUrl
     : movie.poster_path
-      ? `https://image.tmdb.org/t/p/w300${movie.poster_path}`
+      ? 'https://image.tmdb.org/t/p/w300' + movie.poster_path
       : 'https://via.placeholder.com/200x300?text=No+Image';
 
-  const title = movie.title || movie.name || 'Unknown';
-  const rating = movie.rating
+  var title = movie.title || movie.name || 'Unknown';
+  var rating = movie.rating
     ? Math.round(movie.rating * 10)
     : movie.vote_average
       ? Math.round(movie.vote_average * 10)
       : 'N/A';
 
-  card.innerHTML = `
-    <img src="${posterUrl}" alt="${title}" loading="lazy">
-    <div class="movie-card-overlay">
-      <div class="movie-card-title">${title}</div>
-      <div class="movie-card-meta">
-        <span>${rating}% • ${movie.year || new Date().getFullYear()}</span>
-      </div>
-      <div class="movie-card-actions">
-        <button class="movie-card-btn" onclick="handlePlayClick(event, '${title}')">
-          ▶ Play
-        </button>
-        <button class="movie-card-btn" onclick="handleAddToList(event, ${JSON.stringify(movie).replace(/"/g, '&quot;')})">
-          + List
-        </button>
-      </div>
-    </div>
-  `;
+  var genre  = movie.genre || movie.mediaType || 'Movie';
+  var score  = rating + '%';
+  var tmdbId = movie.id || movie.tmdbId || 0;
 
-  card.addEventListener('click', () => openMovieModal(movie));
+  card.innerHTML =
+    '<img src="' + posterUrl + '" alt="' + esc(title) + '" loading="lazy">' +
+    '<div class="movie-card-body">' +
+      '<h6>' + esc(title) + '</h6>' +
+      '<p>'  + esc(genre) + '</p>' +
+      '<span class="badge-sm">' + score + '</span>' +
+      '<button class="btn-add-list" ' +
+        'data-tmdbid="' + tmdbId + '" ' +
+        'data-type="' + esc(movie.media_type || 'movie') + '" ' +
+        'data-title="' + esc(title) + '" ' +
+        'data-genre="' + esc(genre) + '" ' +
+        'data-poster="' + esc(posterUrl) + '" ' +
+        'data-score="' + esc(score) + '">' +
+        '+ My List' +
+      '</button>' +
+    '</div>';
+
+  // Add to list handler
+  var btn = card.querySelector('.btn-add-list');
+  btn.addEventListener('click', async function (e) {
+    e.stopPropagation();
+    var profile = getActiveProfile();
+    if (!profile) { showToast('Please select a profile first.', 'error'); return; }
+
+    var id = parseInt(btn.getAttribute('data-tmdbid'));
+    if (await isInList(id)) {
+      showToast('"' + btn.getAttribute('data-title') + '" is already in your list.', 'info');
+      return;
+    }
+
+    await addToList(
+      id,
+      btn.getAttribute('data-type'),
+      btn.getAttribute('data-title'),
+      btn.getAttribute('data-genre'),
+      btn.getAttribute('data-poster'),
+      btn.getAttribute('data-score')
+    );
+    showToast('"' + btn.getAttribute('data-title') + '" added to My List!', 'success');
+  });
 
   return card;
 }
 
-function setHeroMovie(movie) {
-  const posterUrl = movie.backdropUrl
-    ? movie.backdropUrl
-    : movie.backdrop_path
-      ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
-      : movie.posterUrl
-        ? movie.posterUrl
-        : 'https://via.placeholder.com/1400x400?text=Hero+Image';
-
-  elements.heroBackdrop.style.backgroundImage = `url('${posterUrl}')`;
-  elements.heroTitle.textContent = movie.title || movie.name || 'Unknown';
-  elements.heroDescription.textContent =
-    movie.overview || movie.description || 'No description available.';
-
-  const rating = movie.rating
-    ? Math.round(movie.rating * 10)
-    : movie.vote_average
-      ? Math.round(movie.vote_average * 10)
-      : 'N/A';
-
-  elements.heroRating.textContent = `${rating}% Match`;
-  elements.heroGenre.textContent =
-    movie.genre || movie.mediaType || 'Movie';
-
-  // Store for play button
-  appState.currentMovie = movie;
-
-  // Hide skeleton, show content
-  document.querySelector('.hero-skeleton').style.display = 'none';
-  elements.heroContent.style.display = 'block';
-
-  // Setup hero buttons
-  elements.heroPlayBtn.onclick = () => playMovie(movie);
-  elements.heroAddBtn.onclick = () => addToMyList(movie);
-}
-
 // ═══════════════════════════════════════════════════════════════════
-// MODAL FUNCTIONS
+// UTILITIES
 // ═══════════════════════════════════════════════════════════════════
 
-function openMovieModal(movie) {
-  const posterUrl = movie.posterUrl
-    ? movie.posterUrl
-    : movie.poster_path
-      ? `https://image.tmdb.org/t/p/w300${movie.poster_path}`
-      : 'https://via.placeholder.com/300x450?text=No+Image';
-
-  const backdropUrl = movie.backdropUrl
-    ? movie.backdropUrl
-    : movie.backdrop_path
-      ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
-      : '';
-
-  document.getElementById('modalBackdrop').style.backgroundImage =
-    `url('${backdropUrl}')`;
-  document.getElementById('modalPosterImg').src = posterUrl;
-  document.getElementById('modalTitle').textContent =
-    movie.title || movie.name || 'Unknown';
-  document.getElementById('modalYear').textContent =
-    movie.year || new Date().getFullYear();
-  document.getElementById('modalRating').textContent = `${
-    movie.rating
-      ? Math.round(movie.rating * 10)
-      : movie.vote_average
-        ? Math.round(movie.vote_average * 10)
-        : 'N/A'
-  }%`;
-  document.getElementById('modalGenre').textContent =
-    movie.genre || movie.mediaType || 'Movie';
-  document.getElementById('modalOverview').textContent =
-    movie.overview || movie.description || 'No description available.';
-  document.getElementById('modalCast').textContent =
-    'Cast information not available';
-
-  appState.currentMovie = movie;
-
-  elements.movieModal.classList.add('active');
-}
-
-function closeMovieModal() {
-  elements.movieModal.classList.remove('active');
-}
-
-function openAuthModal() {
-  if (appState.isLoggedIn) {
-    appState.isLoggedIn = false;
-    appState.currentUser = null;
-    localStorage.removeItem('scasflix_user');
-    updateAuthUI();
-    showToast('Logged out successfully', 'info');
+function showToast(message, type) {
+  // Delegate to auth.js showToast if available, otherwise fallback
+  if (typeof window.showToast === 'function' && window.showToast !== showToast) {
+    window.showToast(message, type);
     return;
   }
-
-  elements.authModal.classList.add('active');
+  var toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.className   = 'toast-alert ' + (type || 'info');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(function () {
+    toast.className = 'toast-alert hidden';
+  }, 4500);
 }
 
-function closeAuthModal() {
-  elements.authModal.classList.remove('active');
-  // Reset forms
-  document.getElementById('loginForm').classList.add('active');
-  document.getElementById('registerForm').classList.remove('active');
-  elements.loginEmail.value = '';
-  elements.loginPassword.value = '';
-  elements.registerName.value = '';
-  elements.registerEmail.value = '';
-  elements.registerPassword.value = '';
-}
-
-function toggleAuthForm() {
-  document.getElementById('loginForm').classList.toggle('active');
-  document.getElementById('registerForm').classList.toggle('active');
-}
-
-function openVideoModal(movie) {
-  elements.videoTitle.textContent = movie.title || movie.name || 'Unknown';
-  elements.videoDescription.textContent =
-    movie.overview || 'Now playing...';
-
-  // Set dummy video source (replace with real video URL)
-  elements.videoPlayer.src =
-    'https://www.w3schools.com/html/mov_bbb.mp4';
-
-  elements.videoModal.classList.add('active');
-  elements.videoPlayer.play();
-}
-
-function closeVideoModal() {
-  elements.videoModal.classList.remove('active');
-  elements.videoPlayer.pause();
-  elements.videoPlayer.src = '';
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// AUTHENTICATION FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-function handleLogin() {
-  const email = elements.loginEmail.value.trim();
-  const password = elements.loginPassword.value.trim();
-
-  if (!email || !password) {
-    showToast('Please fill in all fields', 'error');
-    return;
-  }
-
-  if (!email.includes('@')) {
-    showToast('Please enter a valid email', 'error');
-    return;
-  }
-
-  // Simulate login (in real app, this would call backend)
-  appState.isLoggedIn = true;
-  appState.currentUser = {
-    email,
-    name: email.split('@')[0],
-  };
-
-  localStorage.setItem('scasflix_user', JSON.stringify(appState.currentUser));
-
-  closeAuthModal();
-  updateAuthUI();
-  showToast(`Welcome back, ${appState.currentUser.name}!`, 'success');
-}
-
-function handleRegister() {
-  const name = elements.registerName.value.trim();
-  const email = elements.registerEmail.value.trim();
-  const password = elements.registerPassword.value.trim();
-
-  if (!name || !email || !password) {
-    showToast('Please fill in all fields', 'error');
-    return;
-  }
-
-  if (!email.includes('@')) {
-    showToast('Please enter a valid email', 'error');
-    return;
-  }
-
-  if (password.length < 6) {
-    showToast('Password must be at least 6 characters', 'error');
-    return;
-  }
-
-  // Simulate registration
-  appState.isLoggedIn = true;
-  appState.currentUser = {
-    name,
-    email,
-  };
-
-  localStorage.setItem('scasflix_user', JSON.stringify(appState.currentUser));
-
-  closeAuthModal();
-  updateAuthUI();
-  showToast(`Welcome to SCASFLIX, ${name}!`, 'success');
-}
-
-function updateAuthUI() {
-  const authBtn = document.querySelector('.btn-auth');
-
-  if (appState.isLoggedIn) {
-    authBtn.textContent = `${appState.currentUser.name} (Sign Out)`;
-    authBtn.style.background = '#2ecc71';
-  } else {
-    authBtn.textContent = 'Sign In';
-    authBtn.style.background = '';
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// MY LIST FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-function addToMyList(movie) {
-  if (!appState.isLoggedIn) {
-    showToast('Please sign in to add to your list', 'info');
-    openAuthModal();
-    return;
-  }
-
-  const movieId = movie.id || movie.tmdbId;
-
-  if (appState.myList.some((m) => (m.id || m.tmdbId) === movieId)) {
-    showToast('Movie is already in your list', 'info');
-    return;
-  }
-
-  appState.myList.push(movie);
-  localStorage.setItem('scasflix_mylist', JSON.stringify(appState.myList));
-
-  showToast(`${movie.title || movie.name} added to your list!`, 'success');
-
-  // Update My List row if it's visible
-  if (appState.myList.length > 0) {
-    document.getElementById('myListSection').style.display = 'block';
-    document.getElementById('emptyListState').style.display = 'none';
-    renderMovieRow('myListRow', appState.myList, 'mylist');
-  }
-}
-
-function handleAddToList(event, movie) {
-  event.stopPropagation();
-  addToMyList(movie);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// PLAYBACK FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-function playMovie(movie) {
-  if (!appState.isLoggedIn) {
-    showToast('Please sign in to watch movies', 'info');
-    openAuthModal();
-    return;
-  }
-
-  openVideoModal(movie || appState.currentMovie);
-}
-
-function handlePlayClick(event, title) {
-  event.stopPropagation();
-
-  if (!appState.isLoggedIn) {
-    showToast('Please sign in to play movies', 'info');
-    openAuthModal();
-    return;
-  }
-
-  const movie = appState.currentMovie || {
-    title,
-    overview: 'Now playing...',
-  };
-
-  openVideoModal(movie);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// SEARCH FUNCTION
-// ═══════════════════════════════════════════════════════════════════
-
-async function handleSearch() {
-  const query = elements.searchInput.value.trim();
-
-  if (!query) {
-    showToast('Please enter a search term', 'error');
-    return;
-  }
-
-  showLoading(true);
-
-  const results = await fetchFromAPI(
-    `/tmdb/search?q=${encodeURIComponent(query)}`
-  );
-
-  showLoading(false);
-
-  if (results && results.length > 0) {
-    // Display search results (you can create a search results section)
-    console.log('Search results:', results);
-    showToast(`Found ${results.length} results for "${query}"`, 'success');
-    
-    // For demo, show in trending row
-    renderMovieRow('gridTrending', results, 'search');
-  } else {
-    showToast(`No results found for "${query}"`, 'info');
-  }
-
-  elements.searchInput.value = '';
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// NAVIGATION FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-function handleNavClick(section) {
-  if (section === 'mylist') {
-    if (appState.myList.length === 0) {
-      document.getElementById('myListSection').style.display = 'block';
-      document.getElementById('emptyListState').style.display = 'block';
-    } else {
-      document.getElementById('myListSection').style.display = 'block';
-      document.getElementById('emptyListState').style.display = 'none';
-      renderMovieRow('myListRow', appState.myList, 'mylist');
-    }
-  }
-
-  // Close mobile menu if open
-  const navMenu = document.querySelector('.nav-menu');
-  if (navMenu) {
-    navMenu.style.display = 'none';
-  }
-}
-
-function handleNavbarScroll() {
-  if (window.scrollY > 50) {
-    elements.navbar.classList.add('scrolled');
-  } else {
-    elements.navbar.classList.remove('scrolled');
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// UI FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-function showLoading(show) {
-  appState.isLoading = show;
-  elements.loadingIndicator.classList.toggle('active', show);
-}
-
-function showToast(message, type = 'info') {
-  elements.toast.textContent = message;
-  elements.toast.className = `toast ${type} show`;
-
-  setTimeout(() => {
-    elements.toast.classList.remove('show');
-  }, 3000);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// UTILITY FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-function formatDate(dateString) {
-  if (!dateString) return new Date().getFullYear();
-  return new Date(dateString).getFullYear();
-}
-
-function truncateText(text, maxLength = 150) {
-  if (!text) return '';
-  return text.length > maxLength
-    ? text.substring(0, maxLength) + '...'
-    : text;
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
