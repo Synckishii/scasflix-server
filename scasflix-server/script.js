@@ -225,9 +225,13 @@ function createMovieCard(movie) {
   const card = document.createElement('div');
   card.className = 'movie-card';
 
-  const posterUrl = movie.posterUrl || movie.poster_path
-    ? `https://image.tmdb.org/t/p/w200${movie.poster_path}`
-    : 'https://via.placeholder.com/200x300?text=No+Image';
+  // Fix: use posterUrl directly (already full URL from API),
+  // otherwise build from poster_path, otherwise show placeholder.
+  const posterUrl = movie.posterUrl
+    ? movie.posterUrl
+    : movie.poster_path
+      ? `https://image.tmdb.org/t/p/w300${movie.poster_path}`
+      : 'https://via.placeholder.com/200x300?text=No+Image';
 
   const title = movie.title || movie.name || 'Unknown';
   const rating = movie.rating
@@ -260,11 +264,14 @@ function createMovieCard(movie) {
 }
 
 function setHeroMovie(movie) {
-  const posterUrl = movie.posterUrl || movie.backdrop_path
-    ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
-    : movie.poster_path
-      ? `https://image.tmdb.org/t/p/original${movie.poster_path}`
-      : 'https://via.placeholder.com/1400x400?text=Hero+Image';
+  // Fix: use backdropUrl if available (full URL from API)
+  const posterUrl = movie.backdropUrl
+    ? movie.backdropUrl
+    : movie.backdrop_path
+      ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
+      : movie.posterUrl
+        ? movie.posterUrl
+        : 'https://via.placeholder.com/1400x400?text=Hero+Image';
 
   elements.heroBackdrop.style.backgroundImage = `url('${posterUrl}')`;
   elements.heroTitle.textContent = movie.title || movie.name || 'Unknown';
@@ -298,9 +305,11 @@ function setHeroMovie(movie) {
 // ═══════════════════════════════════════════════════════════════════
 
 function openMovieModal(movie) {
-  const posterUrl = movie.posterUrl || movie.poster_path
-    ? `https://image.tmdb.org/t/p/w300${movie.poster_path}`
-    : 'https://via.placeholder.com/300x450?text=No+Image';
+  const posterUrl = movie.posterUrl
+    ? movie.posterUrl
+    : movie.poster_path
+      ? `https://image.tmdb.org/t/p/w300${movie.poster_path}`
+      : 'https://via.placeholder.com/300x450?text=No+Image';
 
   const backdropUrl = movie.backdropUrl || movie.backdrop_path
     ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
@@ -612,67 +621,6 @@ function showToast(message, type = 'info') {
     elements.toast.classList.remove('show');
   }, 3000);
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// ACTIVITY 8 — PHP DATA SOURCE + JS FETCH INTEGRATION
-// Fetches from api_movies.php when running locally (XAMPP/localhost),
-// falls back to the Render backend when hosted on GitHub Pages.
-// ═══════════════════════════════════════════════════════════════════
-
-// 1. Select the container where movies will go
-const movieContainer = document.getElementById('movie-container');
-
-// Detect if we're running locally (php server) or on GitHub Pages
-const isLocal      = window.location.hostname === 'localhost' ||
-                     window.location.hostname === '127.0.0.1';
-const MOVIES_URL   = isLocal
-  ? 'api_movies.php'                    // Local: use PHP file directly
-  : `${API_BASE}/movies`;               // GitHub Pages: use Render backend
-
-// 2. Create the function to get data from the PHP "database"
-function loadMoviesFromPHP() {
-  fetch(MOVIES_URL)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Server responded with status ' + response.status);
-      }
-      return response.json();           // Convert the response to a JS array
-    })
-    .then(data => {
-      // 3. Clear the container first
-      movieContainer.innerHTML = '';
-
-      // 4. Loop through each movie in the data
-      data.forEach(movie => {
-        const card = `
-          <div class="col-6 col-md-4 col-lg-3">
-            <div class="card bg-dark text-white movie-card">
-              <img src="${movie.image}" class="card-img-top" alt="${movie.title}">
-              <div class="card-body">
-                <h6 class="card-title">${movie.title}</h6>
-                <p class="small text-secondary">${movie.category}</p>
-              </div>
-            </div>
-          </div>
-        `;
-        movieContainer.innerHTML += card; // Add the card to the UI
-      });
-    })
-    .catch(error => {
-      // Challenge: Graceful error message if fetch fails
-      console.error('Error fetching movies:', error);
-      if (movieContainer) {
-        movieContainer.innerHTML = `
-          <div style="padding: 2rem; color: #b3b3b3; font-size: 1rem;">
-            Sorry, the SCASFlix server is currently undergoing maintenance. Please try again later.
-          </div>
-        `;
-      }
-    });
-}
-
-// 5. Run the function when the page loads
-document.addEventListener('DOMContentLoaded', loadMoviesFromPHP);
 
 // ═══════════════════════════════════════════════════════════════════
 // UTILITY FUNCTIONS
