@@ -234,6 +234,15 @@ body {
 .movie-card-body p  { font-size: 0.78rem; color: #aaa; margin-bottom: 6px; }
 .badge-sm { font-size: 0.75rem; padding: 3px 9px; border-radius: 3px; background: #28a745; color: #fff; font-weight: 700; }
 
+.btn-add-list {
+  margin-top: 8px; padding: 5px 12px;
+  background: transparent; color: #fff;
+  border: 1px solid rgba(255,255,255,0.4); border-radius: 4px;
+  font-size: 0.78rem; cursor: pointer; font-family: 'Inter', sans-serif;
+  transition: all 0.2s; display: block; width: 100%;
+}
+.btn-add-list:hover { background: #e50914; border-color: #e50914; }
+
 /* =============================================
    FOOTER
    ============================================= */
