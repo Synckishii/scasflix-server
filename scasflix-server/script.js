@@ -1,43 +1,44 @@
+
+Copy
+
 /* ═══════════════════════════════════════════════════════════════════
    SCASFLIX - STREAMING PLATFORM - JAVASCRIPT
    Fixed: Works with actual index.html DOM structure
    Lab 8: PHP fetch integration via api_movies.php
 ═══════════════════════════════════════════════════════════════════ */
-
+ 
 const API_BASE = 'https://scasflix-server.onrender.com/api';
-// For local development, use: 'http://localhost:5000/api'
-
+ 
 // ═══════════════════════════════════════════════════════════════════
 // INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════
-
-document.addEventListener('DOMContentLoaded', () => {
+ 
+document.addEventListener('DOMContentLoaded', function () {
+  console.log('[SCASFLIX] DOMContentLoaded fired');
   setupSearch();
   loadMovies();
-  loadMoviesFromPHP(); // Lab 8: PHP fetch integration
+  loadMoviesFromPHP();
 });
-
+ 
 // ═══════════════════════════════════════════════════════════════════
-// SEARCH SETUP
+// SEARCH
 // ═══════════════════════════════════════════════════════════════════
-
+ 
 function setupSearch() {
   var searchBtn   = document.getElementById('navSearchBtn');
   var searchInput = document.getElementById('navSearchInput');
   if (!searchBtn || !searchInput) return;
-
   searchBtn.addEventListener('click', handleSearch);
   searchInput.addEventListener('keypress', function (e) {
     if (e.key === 'Enter') handleSearch();
   });
 }
-
+ 
 async function handleSearch() {
   var searchInput = document.getElementById('navSearchInput');
   if (!searchInput) return;
   var query = searchInput.value.trim();
   if (!query) { showToast('Please enter a search term.', 'error'); return; }
-
   var results = await fetchFromAPI('/tmdb/search?q=' + encodeURIComponent(query));
   if (results && results.length > 0) {
     renderMovieRow('gridTrending', results);
@@ -47,11 +48,11 @@ async function handleSearch() {
   }
   searchInput.value = '';
 }
-
+ 
 // ═══════════════════════════════════════════════════════════════════
-// API — TMDB (via Express server)
+// API
 // ═══════════════════════════════════════════════════════════════════
-
+ 
 async function fetchFromAPI(endpoint) {
   try {
     var response = await fetch(API_BASE + endpoint, {
@@ -59,12 +60,10 @@ async function fetchFromAPI(endpoint) {
       headers: { 'Content-Type': 'application/json' },
       signal:  AbortSignal.timeout(20000)
     });
-
     if (!response.ok) throw new Error('HTTP ' + response.status);
     return await response.json();
-
   } catch (error) {
-    console.error('API Error on ' + endpoint + ':', error.message);
+    console.error('[SCASFLIX] API Error on ' + endpoint + ':', error.message);
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
       showToast('Server is waking up... please refresh in 30 seconds.', 'error');
     } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
@@ -73,61 +72,63 @@ async function fetchFromAPI(endpoint) {
     return null;
   }
 }
-
-// Ping Render free tier to wake it up before fetching
+ 
 async function pingServer() {
   try {
-    var res = await fetch(API_BASE.replace('/api', '/'), {
-      signal: AbortSignal.timeout(20000)
-    });
+    var res = await fetch(API_BASE.replace('/api', '/'), { signal: AbortSignal.timeout(20000) });
+    console.log('[SCASFLIX] Ping status:', res.status);
     return res.ok;
   } catch (e) {
-    console.warn('Server ping failed:', e.message);
+    console.warn('[SCASFLIX] Server ping failed:', e.message);
     return false;
   }
 }
-
+ 
 async function loadMovies() {
   try {
+    console.log('[SCASFLIX] loadMovies() started');
     showToast('Connecting to server...', 'info');
     await pingServer();
-
-    // Trending
+ 
+    console.log('[SCASFLIX] Fetching /tmdb/trending...');
     var trendingData = await fetchFromAPI('/tmdb/trending');
+    console.log('[SCASFLIX] trending result:', trendingData);
     if (trendingData) {
       var trending = Array.isArray(trendingData) ? trendingData : (trendingData.results || []);
+      console.log('[SCASFLIX] Rendering', trending.length, 'trending cards');
       renderMovieRow('gridTrending', trending);
     }
-
-    // Popular Movies
+ 
+    console.log('[SCASFLIX] Fetching /tmdb/popular-movies...');
     var popularData = await fetchFromAPI('/tmdb/popular-movies');
+    console.log('[SCASFLIX] popular result:', popularData);
     if (popularData) {
       var popular = Array.isArray(popularData) ? popularData : (popularData.results || []);
       renderMovieRow('gridPopular', popular);
     }
-
-    // Popular TV / Student Picks
+ 
+    console.log('[SCASFLIX] Fetching /tmdb/popular-tv...');
     var tvData = await fetchFromAPI('/tmdb/popular-tv');
+    console.log('[SCASFLIX] tv result:', tvData);
     if (tvData) {
       var tv = Array.isArray(tvData) ? tvData : (tvData.results || []);
       renderMovieRow('gridStudentPicks', tv);
     }
-
+ 
+    console.log('[SCASFLIX] loadMovies() complete');
   } catch (error) {
-    console.error('Error loading movies:', error);
+    console.error('[SCASFLIX] loadMovies error:', error);
     showToast('Failed to load movies. Please refresh.', 'error');
   }
 }
-
+ 
 // ═══════════════════════════════════════════════════════════════════
-// LAB 8 — PHP FETCH INTEGRATION (api_movies.php)
-// Task: fetch movies from PHP backend and display them in a section
+// LAB 8 — PHP FETCH
 // ═══════════════════════════════════════════════════════════════════
-
+ 
 function loadMoviesFromPHP() {
   var container = document.getElementById('php-movie-container');
-  if (!container) return; // Section not in index.html, skip silently
-
+  if (!container) return;
   fetch('api_movies.php')
     .then(function (response) {
       if (!response.ok) throw new Error('Server responded with ' + response.status);
@@ -148,8 +149,7 @@ function loadMoviesFromPHP() {
       });
     })
     .catch(function (error) {
-      console.error('Error fetching movies:', error);
-      // Lab 8 Assessment: Graceful error message for users
+      console.error('[SCASFLIX] PHP fetch error:', error);
       if (container) {
         container.innerHTML =
           '<p style="color:#b3b3b3;padding:2rem;grid-column:1/-1;">' +
@@ -158,78 +158,75 @@ function loadMoviesFromPHP() {
       }
     });
 }
-
+ 
 // ═══════════════════════════════════════════════════════════════════
 // RENDERING
 // ═══════════════════════════════════════════════════════════════════
-
+ 
 function renderMovieRow(elementId, movies) {
   var element = document.getElementById(elementId);
-  if (!element) return;
-
+  if (!element) {
+    console.warn('[SCASFLIX] Element not found:', elementId);
+    return;
+  }
   element.innerHTML = '';
-
   if (!movies || movies.length === 0) {
     element.innerHTML = '<p style="color:#b3b3b3;padding:2rem;">No movies found</p>';
     return;
   }
-
   movies.forEach(function (movie) {
     element.appendChild(createMovieCard(movie));
   });
+  console.log('[SCASFLIX] Rendered', movies.length, 'cards into #' + elementId);
 }
-
+ 
 function createMovieCard(movie) {
   var card = document.createElement('div');
   card.className = 'movie-card';
-
+ 
   var posterUrl = movie.posterUrl
     ? movie.posterUrl
     : movie.poster_path
       ? 'https://image.tmdb.org/t/p/w300' + movie.poster_path
       : 'https://via.placeholder.com/200x300?text=No+Image';
-
-  var title = movie.title || movie.name || 'Unknown';
+ 
+  var title  = movie.title || movie.name || 'Unknown';
   var rating = movie.rating
     ? Math.round(movie.rating * 10)
     : movie.vote_average
       ? Math.round(movie.vote_average * 10)
       : 'N/A';
-
   var genre  = movie.genre || movie.mediaType || 'Movie';
   var score  = rating + '%';
   var tmdbId = movie.id || movie.tmdbId || 0;
-
+ 
   card.innerHTML =
     '<img src="' + posterUrl + '" alt="' + esc(title) + '" loading="lazy">' +
     '<div class="movie-card-body">' +
       '<h6>' + esc(title) + '</h6>' +
       '<p>'  + esc(genre) + '</p>' +
       '<span class="badge-sm">' + score + '</span>' +
-      '<button class="btn-add-list" ' +
-        'data-tmdbid="' + tmdbId + '" ' +
-        'data-type="' + esc(movie.media_type || 'movie') + '" ' +
-        'data-title="' + esc(title) + '" ' +
-        'data-genre="' + esc(genre) + '" ' +
-        'data-poster="' + esc(posterUrl) + '" ' +
-        'data-score="' + esc(score) + '">' +
+      '<button class="btn-add-list"' +
+        ' data-tmdbid="' + tmdbId + '"' +
+        ' data-type="'   + esc(movie.media_type || 'movie') + '"' +
+        ' data-title="'  + esc(title) + '"' +
+        ' data-genre="'  + esc(genre) + '"' +
+        ' data-poster="' + esc(posterUrl) + '"' +
+        ' data-score="'  + esc(score) + '">' +
         '+ My List' +
       '</button>' +
     '</div>';
-
-  // Add to list handler
+ 
   var btn = card.querySelector('.btn-add-list');
   btn.addEventListener('click', async function (e) {
     e.stopPropagation();
     var profile = getActiveProfile();
     if (!profile) { showToast('Please select a profile first.', 'error'); return; }
-
     var id = parseInt(btn.getAttribute('data-tmdbid'));
     if (await isInList(id)) {
       showToast('"' + btn.getAttribute('data-title') + '" is already in your list.', 'info');
       return;
     }
-
     await addToList(
       id,
       btn.getAttribute('data-type'),
@@ -240,20 +237,15 @@ function createMovieCard(movie) {
     );
     showToast('"' + btn.getAttribute('data-title') + '" added to My List!', 'success');
   });
-
+ 
   return card;
 }
-
+ 
 // ═══════════════════════════════════════════════════════════════════
 // UTILITIES
 // ═══════════════════════════════════════════════════════════════════
-
+ 
 function showToast(message, type) {
-  // Delegate to auth.js showToast if available, otherwise fallback
-  if (typeof window.showToast === 'function' && window.showToast !== showToast) {
-    window.showToast(message, type);
-    return;
-  }
   var toast = document.getElementById('toast');
   if (!toast) return;
   toast.textContent = message;
@@ -263,7 +255,7 @@ function showToast(message, type) {
     toast.className = 'toast-alert hidden';
   }, 4500);
 }
-
+ 
 function esc(s) {
   return String(s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
