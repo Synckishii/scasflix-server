@@ -1,630 +1,269 @@
-/* ═══════════════════════════════════════════════════════════════════
-   SCASFLIX - STREAMING PLATFORM - JAVASCRIPT
-═══════════════════════════════════════════════════════════════════ */
+/**
+   * script.js
+   * SCASFLIX — Main Frontend Logic (TMDB + MongoDB version)
+   * Enhanced with Top 10 Picks and full functionality
+   */
 
-// ═══════════════════════════════════════════════════════════════════
-// CONFIGURATION
-// ═══════════════════════════════════════════════════════════════════
+  var API_BASE = 'https://scasflix-server.onrender.com/api';
+  var IMG_BASE = 'https://image.tmdb.org/t/p/w300';
 
-const API_BASE = 'https://scasflix-server.onrender.com/api';
-// For local development, use: 'http://localhost:5000/api'
+  // ═══════════════════════════════════════════════════════════════════
+  //  TMDB SECTION LOADER
+  // ═══════════════════════════════════════════════════════════════════
 
-const CONFIG = {
-  movieCardWidth: 200,
-  scrollAmount: 300,
-  animationDuration: 300,
-};
+  async function loadTMDBSection(endpoint, gridId) {
+    var grid = document.getElementById(gridId);
+    if (!grid) return;
 
-// ═══════════════════════════════════════════════════════════════════
-// STATE MANAGEMENT
-// ═══════════════════════════════════════════════════════════════════
+    try {
+      var res   = await fetch(API_BASE + '/tmdb/' + endpoint);
+      var items = await res.json();
 
-let appState = {
-  isLoggedIn: false,
-  currentUser: null,
-  currentMovie: null,
-  myList: [],
-  movies: {
-    trending: [],
-    popular: [],
-    topRated: [],
-  },
-  isLoading: false,
-};
-
-// ═══════════════════════════════════════════════════════════════════
-// DOM ELEMENTS
-// ═══════════════════════════════════════════════════════════════════
-
-const elements = {
-  navbar: document.querySelector('.navbar'),
-  authModal: document.getElementById('authModal'),
-  movieModal: document.getElementById('movieModal'),
-  videoModal: document.getElementById('videoModal'),
-  trendingRow: document.getElementById('trendingRow'),
-  popularRow: document.getElementById('popularRow'),
-  topRatedRow: document.getElementById('topRatedRow'),
-  myListRow: document.getElementById('myListRow'),
-  myListSection: document.getElementById('myListSection'),
-  emptyListState: document.getElementById('emptyListState'),
-  heroContent: document.getElementById('heroContent'),
-  heroBackdrop: document.getElementById('heroBackdrop'),
-  heroTitle: document.getElementById('heroTitle'),
-  heroDescription: document.getElementById('heroDescription'),
-  heroPlayBtn: document.getElementById('heroPlayBtn'),
-  heroAddBtn: document.getElementById('heroAddBtn'),
-  heroRating: document.getElementById('heroRating'),
-  heroGenre: document.getElementById('heroGenre'),
-  loadingIndicator: document.getElementById('loadingIndicator'),
-  toast: document.getElementById('toast'),
-  searchInput: document.getElementById('searchInput'),
-  searchBtn: document.getElementById('searchBtn'),
-  loginEmail: document.getElementById('loginEmail'),
-  loginPassword: document.getElementById('loginPassword'),
-  registerName: document.getElementById('registerName'),
-  registerEmail: document.getElementById('registerEmail'),
-  registerPassword: document.getElementById('registerPassword'),
-  videoPlayer: document.getElementById('videoPlayer'),
-  videoTitle: document.getElementById('videoTitle'),
-  videoDescription: document.getElementById('videoDescription'),
-};
-
-// ═══════════════════════════════════════════════════════════════════
-// INITIALIZATION
-// ═══════════════════════════════════════════════════════════════════
-
-document.addEventListener('DOMContentLoaded', () => {
-  initializeApp();
-  setupEventListeners();
-  loadMovies();
-});
-
-function initializeApp() {
-  // Check if user is logged in (from localStorage)
-  const savedUser = localStorage.getItem('scasflix_user');
-  if (savedUser) {
-    appState.currentUser = JSON.parse(savedUser);
-    appState.isLoggedIn = true;
-    updateAuthUI();
-  }
-
-  // Load My List from localStorage
-  const savedList = localStorage.getItem('scasflix_mylist');
-  if (savedList) {
-    appState.myList = JSON.parse(savedList);
-  }
-}
-
-function setupEventListeners() {
-  // Navbar scroll effect
-  window.addEventListener('scroll', handleNavbarScroll);
-
-  // Search functionality
-  elements.searchBtn.addEventListener('click', handleSearch);
-  elements.searchInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') handleSearch();
-  });
-
-  // Modal close on escape
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeAuthModal();
-      closeMovieModal();
-      closeVideoModal();
-    }
-  });
-
-  // Modal background click
-  elements.authModal.addEventListener('click', (e) => {
-    if (e.target === elements.authModal) closeAuthModal();
-  });
-
-  elements.movieModal.addEventListener('click', (e) => {
-    if (e.target === elements.movieModal) closeMovieModal();
-  });
-
-  elements.videoModal.addEventListener('click', (e) => {
-    if (e.target === elements.videoModal) closeVideoModal();
-  });
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// API FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-async function fetchFromAPI(endpoint) {
-  try {
-    showLoading(true);
-    const response = await fetch(`${API_BASE}${endpoint}`);
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    showLoading(false);
-    return data;
-  } catch (error) {
-    console.error('API Error:', error);
-    showLoading(false);
-    showToast('Failed to load content. Please try again.', 'error');
-    return null;
-  }
-}
-
-async function loadMovies() {
-  try {
-    // Load trending movies
-    const trendingData = await fetchFromAPI('/tmdb/trending');
-    if (trendingData) {
-      appState.movies.trending = Array.isArray(trendingData)
-        ? trendingData
-        : trendingData.results || [];
-      renderMovieRow(
-        'trendingRow',
-        appState.movies.trending,
-        'trending'
-      );
-
-      // Set hero to first trending movie
-      if (appState.movies.trending.length > 0) {
-        setHeroMovie(appState.movies.trending[0]);
+      if (!Array.isArray(items) || items.length === 0) {
+        grid.innerHTML = '<p style="color:#555;padding:20px;">No content available.</p>';
+        return;
       }
+
+      grid.innerHTML = '';
+      
+      // Load ALL items - NO LIMIT
+      for (var i = 0; i < items.length; i++) {
+        var item  = items[i];
+        var inList = typeof isInList === 'function' ? await isInList(item.tmdbId) : false;
+        grid.appendChild(buildMovieCard(item, inList));
+      }
+
+    } catch (err) {
+      console.error('TMDB load error:', err);
+      grid.innerHTML = '<p style="color:#555;padding:20px;">Could not load content. Is the server running?</p>';
     }
+  }
 
-    // Load popular movies
-    const popularData = await fetchFromAPI('/tmdb/popular-movies');
-    if (popularData) {
-      appState.movies.popular = Array.isArray(popularData)
-        ? popularData
-        : popularData.results || [];
-      renderMovieRow('popularRow', appState.movies.popular, 'popular');
+  // ═══════════════════════════════════════════════════════════════════
+  //  TOP 10 PICKS LOADER
+  // ═══════════════════════════════════════════════════════════════════
+
+  async function loadTop10Picks() {
+    var grid = document.getElementById('gridTop10');
+    if (!grid) return;
+
+    try {
+      // Load popular movies and TV shows, then combine and sort by rating
+      var moviesRes = await fetch(API_BASE + '/tmdb/popular-movies');
+      var tvRes = await fetch(API_BASE + '/tmdb/popular-tv');
+      
+      var movies = await moviesRes.json();
+      var tvShows = await tvRes.json();
+      
+      var combined = [...movies, ...tvShows];
+      
+      // Sort by score (rating) descending
+      combined.sort((a, b) => {
+        var scoreA = parseFloat(a.score) || 0;
+        var scoreB = parseFloat(b.score) || 0;
+        return scoreB - scoreA;
+      });
+
+      var top10 = combined.slice(0, 10);
+
+      if (top10.length === 0) {
+        grid.innerHTML = '<p style="color:#555;padding:20px;">No content available.</p>';
+        return;
+      }
+
+      grid.innerHTML = '';
+      for (var i = 0; i < top10.length; i++) {
+        var item = top10[i];
+        var inList = typeof isInList === 'function' ? await isInList(item.tmdbId) : false;
+        var card = buildMovieCard(item, inList);
+        // Add ranking badge
+        var rankBadge = document.createElement('div');
+        rankBadge.style.cssText = 'position:absolute;top:10px;left:10px;background:#f39c12;color:#000;padding:4px 8px;border-radius:4px;font-weight:700;font-size:0.9rem;z-index:5;';
+        rankBadge.textContent = '#' + (i + 1);
+        card.style.position = 'relative';
+        card.appendChild(rankBadge);
+        grid.appendChild(card);
+      }
+
+    } catch (err) {
+      console.error('Top 10 load error:', err);
+      grid.innerHTML = '<p style="color:#555;padding:20px;">Could not load Top 10. Is the server running?</p>';
     }
-
-    // Load top rated movies
-    const topRatedData = await fetchFromAPI('/tmdb/popular-tv');
-    if (topRatedData) {
-      appState.movies.topRated = Array.isArray(topRatedData)
-        ? topRatedData
-        : topRatedData.results || [];
-      renderMovieRow('topRatedRow', appState.movies.topRated, 'toprated');
-    }
-  } catch (error) {
-    console.error('Error loading movies:', error);
-    showToast('Failed to load movies. Please refresh the page.', 'error');
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// RENDERING FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-function renderMovieRow(elementId, movies, category) {
-  const element = document.getElementById(elementId);
-  if (!element) return;
-
-  // Hide skeleton, show content
-  element.style.display = 'flex';
-  element.previousElementSibling.style.display = 'none';
-
-  element.innerHTML = '';
-
-  if (!movies || movies.length === 0) {
-    element.innerHTML =
-      '<p style="color: #b3b3b3; padding: 2rem;">No movies found</p>';
-    return;
   }
 
-  movies.forEach((movie) => {
-    const card = createMovieCard(movie);
-    element.appendChild(card);
-  });
-}
+  // ═══════════════════════════════════════════════════════════════════
+  //  CARD BUILDER
+  // ═══════════════════════════════════════════════════════════════════
 
-function createMovieCard(movie) {
-  const card = document.createElement('div');
-  card.className = 'movie-card';
+  function buildMovieCard(item, inList) {
+    var card = document.createElement('div');
+    card.className = 'movie-card';
 
-  const posterUrl = movie.posterUrl || movie.poster_path
-    ? `https://image.tmdb.org/t/p/w200${movie.poster_path}`
-    : 'https://via.placeholder.com/200x300?text=No+Image';
+    var btnStyle = inList
+      ? 'background:#2ecc71;border-color:#2ecc71;color:#fff;'
+      : 'background:transparent;border:1px solid rgba(255,255,255,0.6);color:#fff;';
+    var btnText = inList ? '✓ In My List' : '+ Add to List';
 
-  const title = movie.title || movie.name || 'Unknown';
-  const rating = movie.rating
-    ? Math.round(movie.rating * 10)
-    : movie.vote_average
-      ? Math.round(movie.vote_average * 10)
-      : 'N/A';
+    card.innerHTML =
+      '<img src="' + esc(item.posterUrl) + '" alt="' + esc(item.title) + '" loading="lazy">' +
+      '<div class="movie-card-body">' +
+        '<h6>' + esc(item.title) + '</h6>' +
+        '<p>'  + esc(item.genre) + '</p>' +
+        '<span class="badge-sm">' + esc(item.score) + '</span>' +
+        '<button class="add-list-btn" ' +
+          'style="margin-top:8px;padding:5px 12px;' + btnStyle + 'border-radius:4px;font-size:0.78rem;cursor:pointer;transition:all 0.2s;display:block;width:100%;" ' +
+          'data-tmdbid="'  + item.tmdbId    + '" ' +
+          'data-type="'    + esc(item.mediaType) + '" ' +
+          'data-title="'   + esc(item.title)     + '" ' +
+          'data-genre="'   + esc(item.genre)     + '" ' +
+          'data-poster="'  + esc(item.posterUrl) + '" ' +
+          'data-score="'   + esc(item.score)     + '">' +
+          btnText +
+        '</button>' +
+      '</div>';
 
-  card.innerHTML = `
-    <img src="${posterUrl}" alt="${title}" loading="lazy">
-    <div class="movie-card-overlay">
-      <div class="movie-card-title">${title}</div>
-      <div class="movie-card-meta">
-        <span>${rating}% • ${movie.year || new Date().getFullYear()}</span>
-      </div>
-      <div class="movie-card-actions">
-        <button class="movie-card-btn" onclick="handlePlayClick(event, '${title}')">
-          ▶ Play
-        </button>
-        <button class="movie-card-btn" onclick="handleAddToList(event, ${JSON.stringify(movie).replace(/"/g, '&quot;')})">
-          + List
-        </button>
-      </div>
-    </div>
-  `;
+    // Wire the add/remove button
+    var btn = card.querySelector('.add-list-btn');
+    btn.addEventListener('click', function() { toggleListBtn(btn); });
 
-  card.addEventListener('click', () => openMovieModal(movie));
-
-  return card;
-}
-
-function setHeroMovie(movie) {
-  const posterUrl = movie.posterUrl || movie.backdrop_path
-    ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
-    : movie.poster_path
-      ? `https://image.tmdb.org/t/p/original${movie.poster_path}`
-      : 'https://via.placeholder.com/1400x400?text=Hero+Image';
-
-  elements.heroBackdrop.style.backgroundImage = `url('${posterUrl}')`;
-  elements.heroTitle.textContent = movie.title || movie.name || 'Unknown';
-  elements.heroDescription.textContent =
-    movie.overview || movie.description || 'No description available.';
-
-  const rating = movie.rating
-    ? Math.round(movie.rating * 10)
-    : movie.vote_average
-      ? Math.round(movie.vote_average * 10)
-      : 'N/A';
-
-  elements.heroRating.textContent = `${rating}% Match`;
-  elements.heroGenre.textContent =
-    movie.genre || movie.mediaType || 'Movie';
-
-  // Store for play button
-  appState.currentMovie = movie;
-
-  // Hide skeleton, show content
-  document.querySelector('.hero-skeleton').style.display = 'none';
-  elements.heroContent.style.display = 'block';
-
-  // Setup hero buttons
-  elements.heroPlayBtn.onclick = () => playMovie(movie);
-  elements.heroAddBtn.onclick = () => addToMyList(movie);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// MODAL FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-function openMovieModal(movie) {
-  const posterUrl = movie.posterUrl || movie.poster_path
-    ? `https://image.tmdb.org/t/p/w300${movie.poster_path}`
-    : 'https://via.placeholder.com/300x450?text=No+Image';
-
-  const backdropUrl = movie.backdropUrl || movie.backdrop_path
-    ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
-    : '';
-
-  document.getElementById('modalBackdrop').style.backgroundImage =
-    `url('${backdropUrl}')`;
-  document.getElementById('modalPosterImg').src = posterUrl;
-  document.getElementById('modalTitle').textContent =
-    movie.title || movie.name || 'Unknown';
-  document.getElementById('modalYear').textContent =
-    movie.year || new Date().getFullYear();
-  document.getElementById('modalRating').textContent = `${
-    movie.rating
-      ? Math.round(movie.rating * 10)
-      : movie.vote_average
-        ? Math.round(movie.vote_average * 10)
-        : 'N/A'
-  }%`;
-  document.getElementById('modalGenre').textContent =
-    movie.genre || movie.mediaType || 'Movie';
-  document.getElementById('modalOverview').textContent =
-    movie.overview || movie.description || 'No description available.';
-  document.getElementById('modalCast').textContent =
-    'Cast information not available';
-
-  appState.currentMovie = movie;
-
-  elements.movieModal.classList.add('active');
-}
-
-function closeMovieModal() {
-  elements.movieModal.classList.remove('active');
-}
-
-function openAuthModal() {
-  if (appState.isLoggedIn) {
-    appState.isLoggedIn = false;
-    appState.currentUser = null;
-    localStorage.removeItem('scasflix_user');
-    updateAuthUI();
-    showToast('Logged out successfully', 'info');
-    return;
+    return card;
   }
 
-  elements.authModal.classList.add('active');
-}
+  // ═══════════════════════════════════════════════════════════════════
+  //  MY LIST TOGGLE
+  // ═══════════════════════════════════════════════════════════════════
 
-function closeAuthModal() {
-  elements.authModal.classList.remove('active');
-  // Reset forms
-  document.getElementById('loginForm').classList.add('active');
-  document.getElementById('registerForm').classList.remove('active');
-  elements.loginEmail.value = '';
-  elements.loginPassword.value = '';
-  elements.registerName.value = '';
-  elements.registerEmail.value = '';
-  elements.registerPassword.value = '';
-}
+  async function toggleListBtn(btn) {
+    var tmdbId    = parseInt(btn.getAttribute('data-tmdbid'));
+    var mediaType = btn.getAttribute('data-type');
+    var title     = btn.getAttribute('data-title');
+    var genre     = btn.getAttribute('data-genre');
+    var posterUrl = btn.getAttribute('data-poster');
+    var score     = btn.getAttribute('data-score');
 
-function toggleAuthForm() {
-  document.getElementById('loginForm').classList.toggle('active');
-  document.getElementById('registerForm').classList.toggle('active');
-}
+    var alreadyIn = await isInList(tmdbId);
 
-function openVideoModal(movie) {
-  elements.videoTitle.textContent = movie.title || movie.name || 'Unknown';
-  elements.videoDescription.textContent =
-    movie.overview || 'Now playing...';
-
-  // Set dummy video source (replace with real video URL)
-  elements.videoPlayer.src =
-    'https://www.w3schools.com/html/mov_bbb.mp4';
-
-  elements.videoModal.classList.add('active');
-  elements.videoPlayer.play();
-}
-
-function closeVideoModal() {
-  elements.videoModal.classList.remove('active');
-  elements.videoPlayer.pause();
-  elements.videoPlayer.src = '';
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// AUTHENTICATION FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-function handleLogin() {
-  const email = elements.loginEmail.value.trim();
-  const password = elements.loginPassword.value.trim();
-
-  if (!email || !password) {
-    showToast('Please fill in all fields', 'error');
-    return;
-  }
-
-  if (!email.includes('@')) {
-    showToast('Please enter a valid email', 'error');
-    return;
-  }
-
-  // Simulate login (in real app, this would call backend)
-  appState.isLoggedIn = true;
-  appState.currentUser = {
-    email,
-    name: email.split('@')[0],
-  };
-
-  localStorage.setItem('scasflix_user', JSON.stringify(appState.currentUser));
-
-  closeAuthModal();
-  updateAuthUI();
-  showToast(`Welcome back, ${appState.currentUser.name}!`, 'success');
-}
-
-function handleRegister() {
-  const name = elements.registerName.value.trim();
-  const email = elements.registerEmail.value.trim();
-  const password = elements.registerPassword.value.trim();
-
-  if (!name || !email || !password) {
-    showToast('Please fill in all fields', 'error');
-    return;
-  }
-
-  if (!email.includes('@')) {
-    showToast('Please enter a valid email', 'error');
-    return;
-  }
-
-  if (password.length < 6) {
-    showToast('Password must be at least 6 characters', 'error');
-    return;
-  }
-
-  // Simulate registration
-  appState.isLoggedIn = true;
-  appState.currentUser = {
-    name,
-    email,
-  };
-
-  localStorage.setItem('scasflix_user', JSON.stringify(appState.currentUser));
-
-  closeAuthModal();
-  updateAuthUI();
-  showToast(`Welcome to SCASFLIX, ${name}!`, 'success');
-}
-
-function updateAuthUI() {
-  const authBtn = document.querySelector('.btn-auth');
-
-  if (appState.isLoggedIn) {
-    authBtn.textContent = `${appState.currentUser.name} (Sign Out)`;
-    authBtn.style.background = '#2ecc71';
-  } else {
-    authBtn.textContent = 'Sign In';
-    authBtn.style.background = '';
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// MY LIST FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-function addToMyList(movie) {
-  if (!appState.isLoggedIn) {
-    showToast('Please sign in to add to your list', 'info');
-    openAuthModal();
-    return;
-  }
-
-  const movieId = movie.id || movie.tmdbId;
-
-  if (appState.myList.some((m) => (m.id || m.tmdbId) === movieId)) {
-    showToast('Movie is already in your list', 'info');
-    return;
-  }
-
-  appState.myList.push(movie);
-  localStorage.setItem('scasflix_mylist', JSON.stringify(appState.myList));
-
-  showToast(`${movie.title || movie.name} added to your list!`, 'success');
-
-  // Update My List row if it's visible
-  if (appState.myList.length > 0) {
-    document.getElementById('myListSection').style.display = 'block';
-    document.getElementById('emptyListState').style.display = 'none';
-    renderMovieRow('myListRow', appState.myList, 'mylist');
-  }
-}
-
-function handleAddToList(event, movie) {
-  event.stopPropagation();
-  addToMyList(movie);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// PLAYBACK FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-function playMovie(movie) {
-  if (!appState.isLoggedIn) {
-    showToast('Please sign in to watch movies', 'info');
-    openAuthModal();
-    return;
-  }
-
-  openVideoModal(movie || appState.currentMovie);
-}
-
-function handlePlayClick(event, title) {
-  event.stopPropagation();
-
-  if (!appState.isLoggedIn) {
-    showToast('Please sign in to play movies', 'info');
-    openAuthModal();
-    return;
-  }
-
-  const movie = appState.currentMovie || {
-    title,
-    overview: 'Now playing...',
-  };
-
-  openVideoModal(movie);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// SEARCH FUNCTION
-// ═══════════════════════════════════════════════════════════════════
-
-async function handleSearch() {
-  const query = elements.searchInput.value.trim();
-
-  if (!query) {
-    showToast('Please enter a search term', 'error');
-    return;
-  }
-
-  showLoading(true);
-
-  const results = await fetchFromAPI(
-    `/tmdb/search?q=${encodeURIComponent(query)}`
-  );
-
-  showLoading(false);
-
-  if (results && results.length > 0) {
-    // Display search results (you can create a search results section)
-    console.log('Search results:', results);
-    showToast(`Found ${results.length} results for "${query}"`, 'success');
-    
-    // For demo, show in trending row
-    renderMovieRow('trendingRow', results, 'search');
-  } else {
-    showToast(`No results found for "${query}"`, 'info');
-  }
-
-  elements.searchInput.value = '';
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// NAVIGATION FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-function handleNavClick(section) {
-  if (section === 'mylist') {
-    if (appState.myList.length === 0) {
-      document.getElementById('myListSection').style.display = 'block';
-      document.getElementById('emptyListState').style.display = 'block';
+    if (alreadyIn) {
+      await removeFromList(tmdbId);
+      btn.textContent       = '+ Add to List';
+      btn.style.background  = 'transparent';
+      btn.style.borderColor = 'rgba(255,255,255,0.6)';
+      btn.style.color       = '#fff';
+      showToast('"' + title + '" removed from My List.', 'info');
     } else {
-      document.getElementById('myListSection').style.display = 'block';
-      document.getElementById('emptyListState').style.display = 'none';
-      renderMovieRow('myListRow', appState.myList, 'mylist');
+      await addToList(tmdbId, mediaType, title, genre, posterUrl, score);
+      btn.textContent       = '✓ In My List';
+      btn.style.background  = '#2ecc71';
+      btn.style.borderColor = '#2ecc71';
+      btn.style.color       = '#fff';
+      showToast('"' + title + '" added to My List!', 'success');
     }
   }
 
-  // Close mobile menu if open
-  const navMenu = document.querySelector('.nav-menu');
-  if (navMenu) {
-    navMenu.style.display = 'none';
+  // ── Re-wire static add-list buttons ──
+  function initListButtons() {
+    var btns = document.querySelectorAll('.add-list-btn[data-title]');
+    btns.forEach(function(btn) {
+      if (btn._wired) return;
+      btn._wired = true;
+      btn.addEventListener('click', function() { toggleListBtn(btn); });
+    });
   }
-}
 
-function handleNavbarScroll() {
-  if (window.scrollY > 50) {
-    elements.navbar.classList.add('scrolled');
-  } else {
-    elements.navbar.classList.remove('scrolled');
+  // ═══════════════════════════════════════════════════════════════════
+  //  SEARCH
+  // ═══════════════════════════════════════════════════════════════════
+
+  var searchInput = document.getElementById('navSearchInput');
+  var searchBtn   = document.getElementById('navSearchBtn');
+
+  async function runSearch() {
+    var query = searchInput ? searchInput.value.trim() : '';
+    if (!query) {
+      showToast('Please enter a movie or show title to search.', 'error');
+      return;
+    }
+
+    showToast('Searching for "' + query + '"...', 'info');
+
+    try {
+      var res   = await fetch(API_BASE + '/tmdb/search?q=' + encodeURIComponent(query));
+      var items = await res.json();
+
+      if (!items.length) {
+        showToast('No results found for "' + query + '".', 'error');
+        return;
+      }
+
+      showSearchResults(query, items);
+      if (searchInput) searchInput.value = '';
+
+    } catch (err) {
+      showToast('Search failed. Is the server running?', 'error');
+    }
   }
-}
 
-// ═══════════════════════════════════════════════════════════════════
-// UI FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
+  function showSearchResults(query, items) {
+    var existing = document.getElementById('searchModal');
+    if (existing) existing.remove();
 
-function showLoading(show) {
-  appState.isLoading = show;
-  elements.loadingIndicator.classList.toggle('active', show);
-}
+    var modal = document.createElement('div');
+    modal.id = 'searchModal';
+    modal.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:3000;' +
+      'overflow-y:auto;padding:80px 40px 40px;';
 
-function showToast(message, type = 'info') {
-  elements.toast.textContent = message;
-  elements.toast.className = `toast ${type} show`;
+    var cardsHTML = items.map(function(item) {
+      return (
+        '<div style="background:#1c1c1c;border-radius:8px;overflow:hidden;cursor:pointer;" ' +
+            'onclick="handleHeroInfo(' + item.id + ',\'' + item.mediaType + '\')">' +
+          '<img src="' + esc(item.posterUrl) + '" alt="' + esc(item.title) + '" ' +
+              'style="width:100%;display:block;" loading="lazy">' +
+          '<div style="padding:10px;">' +
+            '<div style="font-weight:700;font-size:0.88rem;margin-bottom:4px;">' + esc(item.title) + '</div>' +
+            '<div style="color:#888;font-size:0.78rem;">' + esc(item.genre) + '</div>' +
+            '<div style="color:#2ecc71;font-size:0.78rem;font-weight:700;">' + esc(item.score) + '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
 
-  setTimeout(() => {
-    elements.toast.classList.remove('show');
-  }, 3000);
-}
+    modal.innerHTML =
+      '<div style="max-width:1200px;margin:0 auto;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;">' +
+          '<h2 style="font-size:1.5rem;font-weight:900;">Search results for "' + esc(query) + '"</h2>' +
+          '<button onclick="document.getElementById(\'searchModal\').remove()" ' +
+            'style="background:transparent;border:1px solid #555;color:#fff;padding:8px 18px;border-radius:4px;cursor:pointer;font-size:0.9rem;">✕ Close</button>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;">' +
+          cardsHTML +
+        '</div>' +
+      '</div>';
 
-// ═══════════════════════════════════════════════════════════════════
-// UTILITY FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
+    document.body.appendChild(modal);
+  }
 
-function formatDate(dateString) {
-  if (!dateString) return new Date().getFullYear();
-  return new Date(dateString).getFullYear();
-}
+  if (searchInput) {
+    searchInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') runSearch();
+    });
+  }
+  if (searchBtn) {
+    searchBtn.addEventListener('click', runSearch);
+  }
 
-function truncateText(text, maxLength = 150) {
-  if (!text) return '';
-  return text.length > maxLength
-    ? text.substring(0, maxLength) + '...'
-    : text;
-}
+  // ═══════════════════════════════════════════════════════════════════
+  //  BOOT — Load all sections on DOMContentLoaded
+  // ═══════════════════════════════════════════════════════════════════
+
+  document.addEventListener('DOMContentLoaded', async function() {
+    // Load TMDB content into grids
+    await Promise.all([
+      loadTMDBSection('trending',       'gridTrending'),
+      loadTop10Picks(),
+      loadTMDBSection('anime',          'gridStudentPicks'),
+      loadTMDBSection('popular-movies', 'gridPopular')
+    ]);
+
+    initListButtons();
+  });
