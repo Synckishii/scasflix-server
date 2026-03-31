@@ -15,10 +15,11 @@ app.use(cors({ origin: '*' })); // Restrict to your domain in production
 app.use(express.json());
 
 // ── Routes ──────────────────────────────────────────────────────────
-app.use('/api/tmdb', require('./routes/tmdb'));
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/list', require('./routes/list'));
+app.use('/api/tmdb',     require('./routes/tmdb'));
+app.use('/api/auth',     require('./routes/auth'));
+app.use('/api/list',     require('./routes/list'));
 app.use('/api/profiles', require('./routes/profiles'));
+app.use('/api/movies',   require('./routes/movies'));   // Lab Activity 8
 
 // ── Health check ────────────────────────────────────────────────────
 app.get('/', (req, res) => {
