@@ -185,7 +185,7 @@ function renderLockTab(p) {
 }
 
 /* ─ Set PIN ─ */
-function handleSetPin() {
+async function handleSetPin() {
   var pin1 = getPinValue('setPinBoxes');
   var pin2 = getPinValue('confirmPinBoxes');
   var err  = document.getElementById('lockError');
@@ -194,7 +194,7 @@ function handleSetPin() {
   if (pin2.length < 4) { err.textContent='Please confirm your PIN.'; shakePinBoxes('confirmPinBoxes'); return; }
   if (pin1 !== pin2)   { err.textContent='PINs do not match. Try again.'; shakePinBoxes('confirmPinBoxes'); clearPinInput('confirmPinBoxes'); return; }
 
-  var result = setProfilePin(editingSlot, pin1, null);
+  var result = await setProfilePin(editingSlot, pin1, null);
   if (!result.ok) { err.textContent = result.error; return; }
 
   closeManageModal();
@@ -203,7 +203,7 @@ function handleSetPin() {
 }
 
 /* ─ Change PIN (requires current) ─ */
-function handleChangePin() {
+async function handleChangePin() {
   var currentPin = getPinValue('currentPinBoxes');
   var p = getProfileBySlot(editingSlot);
   var err = document.getElementById('lockError');
@@ -211,7 +211,7 @@ function handleChangePin() {
   if (currentPin.length < 4) { err.textContent='Enter your current 4-digit PIN first.'; shakePinBoxes('currentPinBoxes'); return; }
 
   /* Verify current PIN */
-  var check = verifyProfilePin(editingSlot, currentPin);
+  var check = await verifyProfilePin(editingSlot, currentPin);
   if (!check.ok) { err.textContent = check.error; shakePinBoxes('currentPinBoxes'); clearPinInput('currentPinBoxes'); return; }
 
   /* Show new PIN form inside lock tab */
@@ -231,7 +231,7 @@ function handleChangePin() {
   initPinBoxes('confirmNewPinBoxes');
 }
 
-function handleSaveNewPin(currentPin) {
+async function handleSaveNewPin(currentPin) {
   var newPin  = getPinValue('newPinBoxes');
   var confirm = getPinValue('confirmNewPinBoxes');
   var err     = document.getElementById('lockError');
@@ -240,7 +240,7 @@ function handleSaveNewPin(currentPin) {
   if (confirm.length < 4) { err.textContent='Please confirm your new PIN.'; shakePinBoxes('confirmNewPinBoxes'); return; }
   if (newPin !== confirm)  { err.textContent='PINs do not match.'; shakePinBoxes('confirmNewPinBoxes'); clearPinInput('confirmNewPinBoxes'); return; }
 
-  var result = setProfilePin(editingSlot, newPin, currentPin);
+  var result = await setProfilePin(editingSlot, newPin, currentPin);
   if (!result.ok) { err.textContent = result.error; return; }
 
   closeManageModal();
@@ -249,13 +249,13 @@ function handleSaveNewPin(currentPin) {
 }
 
 /* ─ Remove PIN ─ */
-function handleRemovePin() {
+async function handleRemovePin() {
   var currentPin = getPinValue('currentPinBoxes');
   var err        = document.getElementById('lockError');
 
   if (currentPin.length < 4) { err.textContent='Enter your current PIN to remove the lock.'; shakePinBoxes('currentPinBoxes'); return; }
 
-  var result = removeProfilePin(editingSlot, currentPin);
+  var result = await removeProfilePin(editingSlot, currentPin);
   if (!result.ok) { err.textContent=result.error; shakePinBoxes('currentPinBoxes'); clearPinInput('currentPinBoxes'); return; }
 
   closeManageModal();
@@ -264,10 +264,10 @@ function handleRemovePin() {
 }
 
 /* ─ Rename ─ */
-function saveRename() {
+async function saveRename() {
   if (editingSlot === null) return;
   var newName = document.getElementById('renameInput').value;
-  var result  = renameProfile(editingSlot, newName);
+  var result  = await renameProfile(editingSlot, newName);
   if (!result.ok) { document.getElementById('renameError').textContent = result.error; return; }
   closeManageModal();
   renderGrid();
