@@ -135,7 +135,12 @@ function setupEventListeners() {
 async function fetchFromAPI(endpoint) {
   try {
     showLoading(true);
-    const response = await fetch(`${API_BASE}${endpoint}`);
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      // Give Render extra time to wake up from cold start
+      signal: AbortSignal.timeout(15000)
+    });
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -145,15 +150,41 @@ async function fetchFromAPI(endpoint) {
     showLoading(false);
     return data;
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('API Error on ' + endpoint + ':', error.message);
     showLoading(false);
-    showToast('Failed to load content. Please try again.', 'error');
+    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+      showToast('Server is waking up... please refresh in 30 seconds.', 'error');
+    } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+      showToast('Cannot reach server. Check your internet or Render deployment.', 'error');
+    } else {
+      showToast('Failed to load content: ' + error.message, 'error');
+    }
     return null;
+  }
+}
+
+// ── Render Wake-Up Ping ─────────────────────────────────────────────
+// Free Render instances sleep after 15min. This pings the server first
+// so it wakes up before the movie fetch.
+async function pingServer() {
+  try {
+    const res = await fetch(API_BASE.replace('/api', '/'), {
+      signal: AbortSignal.timeout(20000)
+    });
+    console.log('Server ping status:', res.status);
+    return res.ok;
+  } catch (e) {
+    console.warn('Server ping failed:', e.message);
+    return false;
   }
 }
 
 async function loadMovies() {
   try {
+    // Ping the server first to wake it up (Render free tier cold start)
+    showToast('Connecting to server...', 'info');
+    await pingServer();
+
     // Load trending movies
     const trendingData = await fetchFromAPI('/tmdb/trending');
     if (trendingData) {
@@ -225,13 +256,9 @@ function createMovieCard(movie) {
   const card = document.createElement('div');
   card.className = 'movie-card';
 
-  // Fix: use posterUrl directly (already full URL from API),
-  // otherwise build from poster_path, otherwise show placeholder.
-  const posterUrl = movie.posterUrl
-    ? movie.posterUrl
-    : movie.poster_path
-      ? `https://image.tmdb.org/t/p/w300${movie.poster_path}`
-      : 'https://via.placeholder.com/200x300?text=No+Image';
+  const posterUrl = movie.posterUrl || movie.poster_path
+    ? `https://image.tmdb.org/t/p/w200${movie.poster_path}`
+    : 'https://via.placeholder.com/200x300?text=No+Image';
 
   const title = movie.title || movie.name || 'Unknown';
   const rating = movie.rating
@@ -264,14 +291,11 @@ function createMovieCard(movie) {
 }
 
 function setHeroMovie(movie) {
-  // Fix: use backdropUrl if available (full URL from API)
-  const posterUrl = movie.backdropUrl
-    ? movie.backdropUrl
-    : movie.backdrop_path
-      ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
-      : movie.posterUrl
-        ? movie.posterUrl
-        : 'https://via.placeholder.com/1400x400?text=Hero+Image';
+  const posterUrl = movie.posterUrl || movie.backdrop_path
+    ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
+    : movie.poster_path
+      ? `https://image.tmdb.org/t/p/original${movie.poster_path}`
+      : 'https://via.placeholder.com/1400x400?text=Hero+Image';
 
   elements.heroBackdrop.style.backgroundImage = `url('${posterUrl}')`;
   elements.heroTitle.textContent = movie.title || movie.name || 'Unknown';
@@ -305,11 +329,9 @@ function setHeroMovie(movie) {
 // ═══════════════════════════════════════════════════════════════════
 
 function openMovieModal(movie) {
-  const posterUrl = movie.posterUrl
-    ? movie.posterUrl
-    : movie.poster_path
-      ? `https://image.tmdb.org/t/p/w300${movie.poster_path}`
-      : 'https://via.placeholder.com/300x450?text=No+Image';
+  const posterUrl = movie.posterUrl || movie.poster_path
+    ? `https://image.tmdb.org/t/p/w300${movie.poster_path}`
+    : 'https://via.placeholder.com/300x450?text=No+Image';
 
   const backdropUrl = movie.backdropUrl || movie.backdrop_path
     ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}`
